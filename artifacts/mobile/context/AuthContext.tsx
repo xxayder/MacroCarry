@@ -6,7 +6,16 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import type { Profile } from '@/types';
 
+// Required on iOS to dismiss the auth browser when the app is brought back to
+// the foreground via a deep link.
 WebBrowser.maybeCompleteAuthSession();
+
+// The redirect URL sent to Supabase during OAuth.
+// Linking.createURL('auth/callback') produces:
+//   - Standalone build: mobile://auth/callback
+//   - Expo Go (dev):    exp://<host>/--/auth/callback
+// Both must be added to Supabase → Authentication → URL Configuration → Redirect URLs.
+const REDIRECT_URL = Linking.createURL('auth/callback');
 
 interface AuthContextValue {
   user: User | null;
@@ -50,6 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Restore session on mount and listen for auth state changes.
   useEffect(() => {
     if (!isSupabaseConfigured) {
       setLoading(false);
@@ -76,46 +86,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, [fetchProfile]);
 
-  // Handle deep link redirect from OAuth
+  // Handle deep-link fallback for PKCE code exchange.
+  // This fires when the app is cold-started from the OAuth redirect (rare on Android,
+  // but ensures correctness when openAuthSessionAsync doesn't capture the URL directly).
   useEffect(() => {
+    if (!isSupabaseConfigured) return;
+
     const sub = Linking.addEventListener('url', async ({ url }) => {
-      const fragment = url.split('#')[1] ?? '';
-      const params = new URLSearchParams(fragment);
-      const access_token = params.get('access_token');
-      const refresh_token = params.get('refresh_token');
-      if (access_token && refresh_token) {
-        await supabase.auth.setSession({ access_token, refresh_token });
+      if (url.includes('auth/callback')) {
+        await supabase.auth.exchangeCodeForSession(url);
       }
     });
     return () => sub.remove();
   }, []);
 
   const signInWithGoogle = async () => {
-    const redirectUrl = Linking.createURL('/');
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: redirectUrl, skipBrowserRedirect: true },
+      options: {
+        redirectTo: REDIRECT_URL,
+        skipBrowserRedirect: true,
+      },
     });
     if (error) throw error;
-    if (!data?.url) throw new Error('No OAuth URL returned');
+    if (!data?.url) throw new Error('No OAuth URL returned from Supabase');
 
-    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl, {
+    // Open the Google sign-in page in an in-app browser.
+    // When Google redirects back to REDIRECT_URL, the browser is closed and
+    // result.url contains the full redirect URL with the PKCE `code` param.
+    const result = await WebBrowser.openAuthSessionAsync(data.url, REDIRECT_URL, {
       showInRecents: true,
     });
 
     if (result.type === 'success' && result.url) {
-      const fragment = result.url.split('#')[1] ?? '';
-      const params = new URLSearchParams(fragment);
-      const access_token = params.get('access_token');
-      const refresh_token = params.get('refresh_token');
-      if (access_token && refresh_token) {
-        const { error: sessionError } = await supabase.auth.setSession({
-          access_token,
-          refresh_token,
-        });
-        if (sessionError) throw sessionError;
-      }
+      // Exchange the PKCE authorization code for a Supabase session.
+      // supabase-js parses the `code` query param from the URL internally.
+      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(result.url);
+      if (exchangeError) throw exchangeError;
+      // onAuthStateChange above will update user/session state automatically.
     }
+    // result.type === 'cancel' means the user closed the browser — do nothing.
   };
 
   const signOut = async () => {
