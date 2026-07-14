@@ -1,0 +1,44 @@
+Diagnose and fix the existing Google OAuth flow. Do not rewrite unrelated authentication or UI code.
+
+The app is currently being tested in a desktop web browser through Replit, but the OAuth implementation may be using mobile:// as redirectTo for every platform.
+
+Requirements:
+
+1. Inspect the project and determine whether it uses Expo React Native, Expo Router, React, Vite, Next.js, or another framework.
+2. Find every call to supabase.auth.signInWithOAuth.
+3. Find the exact redirectTo value currently sent during Google login.
+4. Make the OAuth redirect platform-aware.
+
+For web:
+- Use the current browser origin as the redirect base.
+- Prefer `${window.location.origin}/auth/callback` if the app has an auth callback route.
+- Otherwise use `window.location.origin`.
+- Do not use mobile:// on web.
+- Do not use skipBrowserRedirect: true unless the web popup flow explicitly requires it.
+- If expo-web-browser is used on web, ensure WebBrowser.maybeCompleteAuthSession() runs at module scope.
+- Ensure the callback route restores or exchanges the Supabase session correctly.
+
+For native mobile:
+- Keep a registered custom scheme such as mobile://auth/callback.
+- Confirm the scheme exists in app.json, app.config.js, or app.config.ts.
+- Use makeRedirectUri or Linking.createURL rather than hardcoding incompatible platform URLs.
+- Use WebBrowser.openAuthSessionAsync only for the native flow when appropriate.
+
+5. Add temporary diagnostic logging that prints:
+- Platform.OS
+- generated redirectTo value
+- whether signInWithOAuth returned an error
+- the OAuth URL hostname without exposing tokens
+- the WebBrowser result type
+- callback URL hostname and pathname without exposing tokens
+
+6. Never expose or log the Google client secret, Supabase service-role key, access tokens, refresh tokens, authorization codes, or URL fragments containing credentials.
+
+7. Report:
+- the root cause
+- files changed
+- exact redirect URL I must add to Supabase
+- exact JavaScript origin I must add to Google Cloud
+- whether I must restart, rebuild, or republish the app
+
+Test the corrected web OAuth flow after making the smallest necessary changes.

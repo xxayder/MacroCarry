@@ -72,6 +72,10 @@ function RootLayoutNav() {
         name="shared-with-me"
         options={{ headerShown: false, title: 'Shared With Me' }}
       />
+      <Stack.Screen
+        name="auth/callback"
+        options={{ headerShown: false }}
+      />
     </Stack>
   );
 }
