@@ -153,18 +153,78 @@ create policy "Shared viewers can see their shares"
 
 ### 3. Enable Google OAuth
 
-In your Supabase dashboard:
+This requires steps in **both** Google Cloud Console and Supabase. Do them in order.
 
-1. Go to **Authentication → Providers → Google**
-2. Enable Google provider
-3. Create a Google OAuth app at [console.cloud.google.com](https://console.cloud.google.com):
-   - Create a new project (or use existing)
-   - Enable Google+ API
-   - Create OAuth 2.0 credentials
-   - Authorized redirect URIs: `https://YOUR_PROJECT.supabase.co/auth/v1/callback`
-4. Copy the **Client ID** and **Client Secret** back to Supabase
-5. In Supabase **Authentication → URL Configuration**, add:
-   - Redirect URL: `mobile://` (matches the app scheme)
+---
+
+#### A. Get the callback URL from Supabase first
+
+1. Go to your Supabase dashboard → **Authentication → Providers → Google**
+2. Toggle **Google enabled** ON
+3. You'll see a **Callback URL (for OAuth)** on that page — it looks like:
+   `https://abcdefghijklmnop.supabase.co/auth/v1/callback`
+4. **Copy that URL** — you'll need it in step B. Don't save in Supabase yet.
+
+---
+
+#### B. Set up a Google Cloud project
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com)
+2. Click the project dropdown at the top → **New Project** → give it a name → **Create**
+3. Make sure your new project is selected in the top dropdown
+
+---
+
+#### C. Configure the OAuth consent screen
+
+This must be done before you can create credentials.
+
+1. In the left sidebar, go to **APIs & Services → OAuth consent screen**
+2. Choose **External** → click **Create**
+3. Fill in the required fields:
+   - **App name**: MacroCarry (or whatever you like)
+   - **User support email**: your email address
+   - **Developer contact information**: your email address
+4. Click **Save and Continue** through the rest of the screens (Scopes, Test users) — defaults are fine
+5. On the **Summary** page click **Back to Dashboard**
+6. Click **Publish App** → **Confirm** (this moves it from Testing to Production so any Google account can log in, not just test users you manually add)
+
+---
+
+#### D. Create OAuth credentials
+
+1. In the left sidebar go to **APIs & Services → Credentials**
+2. Click **+ Create Credentials → OAuth client ID**
+3. For **Application type** choose **Web application**
+4. Give it a name (e.g. "MacroCarry")
+5. Under **Authorized redirect URIs** click **+ Add URI** and paste the Supabase callback URL you copied in step A:
+   `https://abcdefghijklmnop.supabase.co/auth/v1/callback`
+6. Click **Create**
+7. A dialog shows your **Client ID** and **Client Secret** — copy both
+
+---
+
+#### E. Finish in Supabase
+
+1. Back in Supabase → **Authentication → Providers → Google**
+2. Paste the **Client ID** and **Client Secret** from step D
+3. Click **Save**
+
+---
+
+#### F. Add the mobile redirect URL
+
+1. In Supabase → **Authentication → URL Configuration**
+2. Under **Redirect URLs** click **Add URL**
+3. Add exactly: `mobile://`
+4. Click **Save**
+
+---
+
+> **Common mistakes:**
+> - Skipping "Publish App" on the consent screen — only manually-added test users can log in until you publish
+> - Using the wrong application type (must be **Web application**, not iOS/Android)
+> - Forgetting to add `mobile://` to Supabase redirect URLs (the app will hang after Google sign-in)
 
 ---
 
