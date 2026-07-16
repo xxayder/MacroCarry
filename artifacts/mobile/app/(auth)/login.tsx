@@ -14,22 +14,37 @@ import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
 
 export default function LoginScreen() {
-  const { signInWithGoogle, isConfigured } = useAuth();
+  const { signInWithGoogle, isConfigured, isExpoGo } = useAuth();
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const [loading, setLoading] = useState(false);
+  const [isSigningIn, setIsSigningIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isExpoGoWarning, setIsExpoGoWarning] = useState(false);
 
   const handleGoogle = async () => {
-    setLoading(true);
+    // Detect Expo Go before starting — show informational message, not a spinner.
+    if (isExpoGo) {
+      setIsExpoGoWarning(true);
+      setError(null);
+      return;
+    }
+
+    setIsSigningIn(true);
     setError(null);
+    setIsExpoGoWarning(false);
     try {
       await signInWithGoogle();
       router.replace('/');
     } catch (err: any) {
-      setError(err.message ?? 'Sign-in failed. Please try again.');
+      const msg: string = err?.message ?? 'Sign-in failed. Please try again.';
+      // Treat the Expo Go guard message as an info notice, not a red error.
+      if (msg.includes('development build')) {
+        setIsExpoGoWarning(true);
+      } else {
+        setError(msg);
+      }
     } finally {
-      setLoading(false);
+      setIsSigningIn(false);
     }
   };
 
@@ -65,18 +80,39 @@ export default function LoginScreen() {
 
       {/* CTA */}
       <View style={styles.cta}>
-        {error && (
+        {/* Expo Go notice — informational, not an error */}
+        {isExpoGoWarning && (
+          <View style={[styles.noticeBox, { backgroundColor: colors.primarySubtle, borderColor: colors.primary + '44' }]}>
+            <Feather name="info" size={14} color={colors.primary} style={{ marginTop: 1 }} />
+            <Text style={[styles.noticeText, { color: colors.primary }]}>
+              Google sign-in requires the MacroCarry{' '}
+              <Text style={styles.bold}>development build</Text>, not Expo Go.{'\n'}
+              Build and install the dev APK with EAS, then sign in.
+            </Text>
+          </View>
+        )}
+
+        {/* Regular error */}
+        {error && !isExpoGoWarning && (
           <View style={[styles.errorBox, { backgroundColor: colors.destructive + '22', borderColor: colors.destructive + '44' }]}>
             <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
           </View>
         )}
+
         <TouchableOpacity
-          style={[styles.googleBtn, { backgroundColor: colors.surface, borderColor: colors.border, opacity: loading ? 0.7 : 1 }]}
+          style={[
+            styles.googleBtn,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              opacity: isSigningIn || !isConfigured ? 0.7 : 1,
+            },
+          ]}
           onPress={handleGoogle}
-          disabled={loading || !isConfigured}
+          disabled={isSigningIn || !isConfigured}
           activeOpacity={0.8}
         >
-          {loading ? (
+          {isSigningIn ? (
             <ActivityIndicator color={colors.primary} size="small" />
           ) : (
             <>
@@ -111,6 +147,9 @@ const styles = StyleSheet.create({
   featureIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   featureText: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 20 },
   cta: { gap: 14 },
+  noticeBox: { flexDirection: 'row', gap: 8, padding: 12, borderRadius: 10, borderWidth: 1, alignItems: 'flex-start' },
+  noticeText: { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 19 },
+  bold: { fontFamily: 'Inter_600SemiBold' },
   errorBox: { padding: 12, borderRadius: 10, borderWidth: 1 },
   errorText: { fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center' },
   googleBtn: {

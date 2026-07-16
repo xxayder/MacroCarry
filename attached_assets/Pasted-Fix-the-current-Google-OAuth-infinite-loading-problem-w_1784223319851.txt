@@ -1,0 +1,126 @@
+Fix the current Google OAuth infinite-loading problem without changing the Google Cloud credentials and without changing auth flow types again.
+
+Current facts:
+
+- The app is being opened inside Expo Go on Android.
+- Native Supabase auth currently uses implicit flow.
+- Web Supabase auth uses PKCE.
+- Google account selection succeeds.
+- The app then remains in an infinite loading state.
+- Expo Go cannot receive the custom mobile:// URL scheme compiled for the actual application.
+- The supported native callback for an installed Development Build is:
+  mobile://auth/callback
+- Supabase Site URL will be changed manually to:
+  https://food-log-tracker---xayder15.replit.app
+- Supabase Redirect URLs will include:
+  https://food-log-tracker---xayder15.replit.app
+  https://food-log-tracker---xayder15.replit.app/auth/callback
+  mobile://auth/callback
+
+Do not modify unrelated UI, onboarding, database, or nutrition logic.
+
+Tasks:
+
+1. Audit every Supabase createClient call.
+   - There must be exactly one shared client per platform.
+   - Report every createClient location.
+   - Preserve native implicit flow and web PKCE for now.
+
+2. Audit app.json, app.config.js, and app.config.ts.
+   - Ensure expo.scheme is exactly "mobile".
+   - Preserve the existing android.package if one exists.
+   - If android.package is missing, report that clearly before attempting an EAS build.
+   - Do not invent or change an existing package identifier.
+
+3. Detect Expo Go safely using expo-constants.
+   - Constants.expoGoConfig being non-null indicates Expo Go.
+   - When running inside Expo Go, do not attempt the mobile:// OAuth flow.
+   - Display a clear development message:
+     "Google sign-in requires the installed Macro Carry development build, not Expo Go."
+   - Immediately clear all sign-in loading state.
+   - Do not leave an infinite spinner.
+
+4. Generate redirects by environment:
+
+   Web:
+   `${window.location.origin}/auth/callback`
+
+   Installed native Development Build or standalone build:
+   `makeRedirectUri({
+      scheme: "mobile",
+      path: "auth/callback"
+    })`
+
+   The native result must be exactly:
+   mobile://auth/callback
+
+5. Find every signInWithOAuth call.
+   - Native must use:
+       provider: "google"
+       redirectTo: mobile://auth/callback
+       skipBrowserRedirect: true
+   - Web must use the existing web callback.
+   - Use the exact same native redirectTo string as the second argument to WebBrowser.openAuthSessionAsync.
+
+6. For native implicit flow:
+   - Parse access_token and refresh_token from the successful callback URL.
+   - Call supabase.auth.setSession exactly once.
+   - Never call exchangeCodeForSession on native implicit callbacks.
+   - Prevent duplicate callback handling.
+
+7. Audit every use of:
+   - WebBrowser.openAuthSessionAsync
+   - WebBrowser.maybeCompleteAuthSession
+   - Linking.useURL
+   - Linking.addEventListener
+   - exchangeCodeForSession
+   - setSession
+   - onAuthStateChange
+   - getSession
+   - setLoading
+   - setIsLoading
+   - setSigningIn
+
+8. Fix all loading-state paths.
+   - OAuth button loading must be controlled by a separate isSigningIn state.
+   - It must be reset in a finally block.
+   - Reset it after success, cancellation, dismissal, browser errors, Supabase errors, callback parsing errors, and unsupported Expo Go execution.
+   - The global authentication provider must set its initialization loading state to false in a finally block after getSession.
+   - Never let an unresolved OAuth operation block the entire application indefinitely.
+
+9. Add safe diagnostic logs showing only:
+   - whether runtime is web, Expo Go, or Development Build
+   - generated redirectTo
+   - WebBrowser result type
+   - callback scheme, host, and pathname
+   - whether access_token exists
+   - whether refresh_token exists
+   - whether a code parameter exists
+   - whether setSession was called
+   - whether callback processing was skipped as a duplicate
+
+   Never log full callback URLs, access tokens, refresh tokens, authorization codes, Google credentials, client secrets, Supabase service-role keys, or URL fragments.
+
+10. Prepare the project for an Android Expo Development Build:
+   - Install expo-dev-client using the Expo-compatible package command.
+   - Create or verify eas.json with:
+       developmentClient: true
+       distribution: internal
+   - Do not run an authenticated EAS build automatically.
+   - Report the exact shell commands I need to run manually:
+       npx eas-cli@latest login
+       npx eas-cli@latest build:configure
+       npx eas-cli@latest build --profile development --platform android
+       npx expo start --dev-client --tunnel
+
+11. Run TypeScript and lint checks.
+
+Report:
+- root cause of the spinner
+- every file changed
+- actual runtime redirect before the fix
+- corrected Development Build redirect
+- every location that could leave loading enabled
+- whether duplicate callback handlers existed
+- whether android.package is already configured
+- whether the project is ready for EAS Build
