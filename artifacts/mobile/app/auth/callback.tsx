@@ -7,33 +7,48 @@ import { supabase } from '@/lib/supabase';
 /**
  * Web-only OAuth callback route — /auth/callback
  *
- * After Google sign-in, Supabase redirects the browser here with a PKCE
- * ?code= query param. We exchange that code for a session, then push to /.
- * On native, this file is never navigated to (deep links go via Linking).
+ * With implicit flow, Supabase redirects here with tokens in the URL fragment:
+ *   /auth/callback#access_token=…&refresh_token=…
+ *
+ * detectSessionInUrl:true (set in lib/supabase.ts for web) tells supabase-js
+ * to automatically parse the fragment and establish the session on page load.
+ * We just wait for that to complete, then push to /.
  */
 export default function AuthCallback() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    async function exchange() {
-      try {
-        // window.location.href contains the full URL including ?code=…
-        const { error } = await supabase.auth.exchangeCodeForSession(window.location.href);
-        if (error) {
-          console.warn('[AuthCallback] exchangeCodeForSession error:', error.message);
-          setErrorMsg(error.message);
-          return;
-        }
-        // Session established — onAuthStateChange in AuthContext picks it up.
-        // Navigate to root; index.tsx will redirect to tabs or onboarding.
-        router.replace('/');
-      } catch (e: any) {
-        console.warn('[AuthCallback] unexpected error:', e?.message);
-        setErrorMsg(e?.message ?? 'Unknown error');
+    // detectSessionInUrl:true means supabase-js fires onAuthStateChange with
+    // the new session automatically. We just need to redirect once it's done.
+    // As a safety net, also check getSession() in case it resolved already.
+    const check = async () => {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error) {
+        console.warn('[AuthCallback] getSession error:', error.message);
+        setErrorMsg(error.message);
+        return;
       }
-    }
+      if (session) {
+        router.replace('/');
+      }
+    };
 
-    exchange();
+    // Give supabase-js a moment to parse the URL fragment and store the session.
+    const timer = setTimeout(check, 500);
+
+    // Also listen for auth state change as the authoritative signal.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[AuthCallback] auth event:', event);
+      if (session) {
+        clearTimeout(timer);
+        router.replace('/');
+      }
+    });
+
+    return () => {
+      clearTimeout(timer);
+      subscription.unsubscribe();
+    };
   }, []);
 
   if (errorMsg) {
