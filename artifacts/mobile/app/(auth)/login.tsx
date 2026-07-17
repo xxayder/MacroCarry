@@ -1,10 +1,14 @@
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -14,153 +18,173 @@ import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
 
 export default function LoginScreen() {
-  const { signInWithGoogle, isConfigured, isExpoGo } = useAuth();
+  const { signIn, isConfigured } = useAuth();
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const [isSigningIn, setIsSigningIn] = useState(false);
+  const passwordRef = useRef<TextInput>(null);
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isExpoGoWarning, setIsExpoGoWarning] = useState(false);
 
-  const handleGoogle = async () => {
-    // Detect Expo Go before starting — show informational message, not a spinner.
-    if (isExpoGo) {
-      setIsExpoGoWarning(true);
-      setError(null);
-      return;
-    }
-
-    setIsSigningIn(true);
+  const handleSignIn = async () => {
     setError(null);
-    setIsExpoGoWarning(false);
+
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) { setError('Email is required.'); return; }
+    if (!password) { setError('Password is required.'); return; }
+
+    setLoading(true);
     try {
-      await signInWithGoogle();
+      await signIn(trimmedEmail, password);
       router.replace('/');
     } catch (err: any) {
-      const msg: string = err?.message ?? 'Sign-in failed. Please try again.';
-      // Treat the Expo Go guard message as an info notice, not a red error.
-      if (msg.includes('development build')) {
-        setIsExpoGoWarning(true);
-      } else {
-        setError(msg);
-      }
+      setError(err.message ?? 'Sign-in failed. Please try again.');
     } finally {
-      setIsSigningIn(false);
+      setLoading(false);
     }
   };
 
   return (
-    <View
-      style={[
-        styles.container,
-        { backgroundColor: colors.background, paddingTop: insets.top + 60, paddingBottom: insets.bottom + 24 },
-      ]}
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: colors.background }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      {/* Brand */}
-      <View style={styles.brand}>
-        <View style={[styles.logoBox, { backgroundColor: colors.primarySubtle }]}>
-          <Feather name="activity" size={40} color={colors.primary} />
+      <ScrollView
+        contentContainerStyle={[
+          styles.container,
+          { paddingTop: insets.top + 56, paddingBottom: insets.bottom + 32 },
+        ]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Brand */}
+        <View style={styles.brand}>
+          <View style={[styles.logoBox, { backgroundColor: colors.primarySubtle }]}>
+            <Feather name="activity" size={36} color={colors.primary} />
+          </View>
+          <Text style={[styles.appName, { color: colors.text }]}>MacroCarry</Text>
+          <Text style={[styles.tagline, { color: colors.textSecondary }]}>
+            Sign in to your account
+          </Text>
         </View>
-        <Text style={[styles.appName, { color: colors.text }]}>MacroCarry</Text>
-        <Text style={[styles.tagline, { color: colors.textSecondary }]}>
-          Smarter food tracking.{'\n'}Calories that carry forward.
-        </Text>
-      </View>
 
-      {/* Features */}
-      <View style={styles.features}>
-        {FEATURES.map((f) => (
-          <View key={f.text} style={styles.featureRow}>
-            <View style={[styles.featureIcon, { backgroundColor: colors.surface }]}>
-              <Feather name={f.icon as any} size={16} color={colors.primary} />
+        {/* Form */}
+        <View style={styles.form}>
+          {error && (
+            <View style={[styles.errorBox, { backgroundColor: colors.destructive + '18', borderColor: colors.destructive + '40' }]}>
+              <Feather name="alert-circle" size={14} color={colors.destructive} style={{ marginTop: 1 }} />
+              <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
             </View>
-            <Text style={[styles.featureText, { color: colors.textSecondary }]}>{f.text}</Text>
-          </View>
-        ))}
-      </View>
-
-      {/* CTA */}
-      <View style={styles.cta}>
-        {/* Expo Go notice — informational, not an error */}
-        {isExpoGoWarning && (
-          <View style={[styles.noticeBox, { backgroundColor: colors.primarySubtle, borderColor: colors.primary + '44' }]}>
-            <Feather name="info" size={14} color={colors.primary} style={{ marginTop: 1 }} />
-            <Text style={[styles.noticeText, { color: colors.primary }]}>
-              Google sign-in requires the MacroCarry{' '}
-              <Text style={styles.bold}>development build</Text>, not Expo Go.{'\n'}
-              Build and install the dev APK with EAS, then sign in.
-            </Text>
-          </View>
-        )}
-
-        {/* Regular error */}
-        {error && !isExpoGoWarning && (
-          <View style={[styles.errorBox, { backgroundColor: colors.destructive + '22', borderColor: colors.destructive + '44' }]}>
-            <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
-          </View>
-        )}
-
-        <TouchableOpacity
-          style={[
-            styles.googleBtn,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-              opacity: isSigningIn || !isConfigured ? 0.7 : 1,
-            },
-          ]}
-          onPress={handleGoogle}
-          disabled={isSigningIn || !isConfigured}
-          activeOpacity={0.8}
-        >
-          {isSigningIn ? (
-            <ActivityIndicator color={colors.primary} size="small" />
-          ) : (
-            <>
-              <Feather name="user" size={18} color={colors.text} />
-              <Text style={[styles.googleBtnText, { color: colors.text }]}>Continue with Google</Text>
-            </>
           )}
-        </TouchableOpacity>
-        <Text style={[styles.terms, { color: colors.textMuted }]}>
-          By continuing, you agree to our Terms of Service and Privacy Policy.
-        </Text>
-      </View>
-    </View>
+
+          {/* Email */}
+          <View style={styles.fieldGroup}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Email</Text>
+            <View style={[styles.inputRow, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+              <Feather name="mail" size={16} color={colors.textMuted} />
+              <TextInput
+                style={[styles.input, { color: colors.text }]}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="you@example.com"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
+                returnKeyType="next"
+                onSubmitEditing={() => passwordRef.current?.focus()}
+              />
+            </View>
+          </View>
+
+          {/* Password */}
+          <View style={styles.fieldGroup}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Password</Text>
+            <View style={[styles.inputRow, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+              <Feather name="lock" size={16} color={colors.textMuted} />
+              <TextInput
+                ref={passwordRef}
+                style={[styles.input, { color: colors.text }]}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Password"
+                placeholderTextColor={colors.textMuted}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="current-password"
+                returnKeyType="done"
+                onSubmitEditing={handleSignIn}
+              />
+              <TouchableOpacity onPress={() => setShowPassword((v) => !v)} hitSlop={8}>
+                <Feather name={showPassword ? 'eye-off' : 'eye'} size={16} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Submit */}
+          <TouchableOpacity
+            style={[styles.btn, { backgroundColor: colors.primary, opacity: loading || !isConfigured ? 0.7 : 1 }]}
+            onPress={handleSignIn}
+            disabled={loading || !isConfigured}
+            activeOpacity={0.8}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <Text style={styles.btnText}>Sign In</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* Footer */}
+        <View style={styles.footer}>
+          <Text style={[styles.footerText, { color: colors.textSecondary }]}>
+            Don't have an account?{' '}
+          </Text>
+          <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
+            <Text style={[styles.footerLink, { color: colors.primary }]}>Create one</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
-const FEATURES = [
-  { icon: 'trending-up', text: 'Track calories, macros, fiber, sugar & sodium' },
-  { icon: 'camera', text: 'Scan barcodes with your camera' },
-  { icon: 'repeat', text: 'Unused calories carry over to tomorrow' },
-  { icon: 'share-2', text: 'Share your food diary with others' },
-];
-
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 28, justifyContent: 'space-between' },
-  brand: { alignItems: 'center', gap: 12 },
-  logoBox: { width: 88, height: 88, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  appName: { fontSize: 34, fontFamily: 'Inter_700Bold' },
-  tagline: { fontSize: 15, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 22 },
-  features: { gap: 14 },
-  featureRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  featureIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  featureText: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 20 },
-  cta: { gap: 14 },
-  noticeBox: { flexDirection: 'row', gap: 8, padding: 12, borderRadius: 10, borderWidth: 1, alignItems: 'flex-start' },
-  noticeText: { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 19 },
-  bold: { fontFamily: 'Inter_600SemiBold' },
-  errorBox: { padding: 12, borderRadius: 10, borderWidth: 1 },
-  errorText: { fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center' },
-  googleBtn: {
+  container: { paddingHorizontal: 28, gap: 32 },
+  brand: { alignItems: 'center', gap: 10 },
+  logoBox: { width: 80, height: 80, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  appName: { fontSize: 30, fontFamily: 'Inter_700Bold' },
+  tagline: { fontSize: 14, fontFamily: 'Inter_400Regular' },
+  form: { gap: 16 },
+  errorBox: { flexDirection: 'row', gap: 8, padding: 12, borderRadius: 10, borderWidth: 1, alignItems: 'flex-start' },
+  errorText: { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 19 },
+  fieldGroup: { gap: 6 },
+  label: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: 10,
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+  },
+  input: { flex: 1, fontSize: 15, fontFamily: 'Inter_400Regular' },
+  btn: {
     height: 52,
     borderRadius: 14,
-    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
   },
-  googleBtnText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
-  terms: { fontSize: 11, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 16 },
+  btnText: { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: '#fff' },
+  footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  footerText: { fontSize: 14, fontFamily: 'Inter_400Regular' },
+  footerLink: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
 });

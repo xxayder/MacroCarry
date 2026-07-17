@@ -1,51 +1,54 @@
 import type { Session, User } from '@supabase/supabase-js';
-import Constants from 'expo-constants';
-import * as Linking from 'expo-linking';
-import * as WebBrowser from 'expo-web-browser';
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { Platform } from 'react-native';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import type { Profile } from '@/types';
 
-// Dismiss the in-app browser on iOS when the app returns via deep link.
-WebBrowser.maybeCompleteAuthSession();
+// ─── Username validation ──────────────────────────────────────────────────────
+const USERNAME_REGEX = /^[a-zA-Z0-9_]+$/;
 
-// ─── Environment detection ────────────────────────────────────────────────────
-// Constants.expoGoConfig is non-null only when running inside Expo Go.
-const IS_EXPO_GO = Constants.expoGoConfig != null;
-const RUNTIME =
-  Platform.OS === 'web' ? 'web' : IS_EXPO_GO ? 'Expo Go' : 'Development/Production Build';
-
-// ─── Redirect URL ─────────────────────────────────────────────────────────────
-// Web:    full-page redirect; detectSessionInUrl:true handles the session.
-// Native: makeRedirectUri produces mobile://auth/callback (dev/prod build).
-//         Expo Go cannot receive the mobile:// scheme — we block it below.
-function buildRedirectUrl(): string {
-  if (Platform.OS === 'web') {
-    return `${window.location.origin}/auth/callback`;
-  }
-  // Import makeRedirectUri lazily so web bundles don't trip over it.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { makeRedirectUri } = require('expo-auth-session') as typeof import('expo-auth-session');
-  return makeRedirectUri({ scheme: 'mobile', path: 'auth/callback' });
+export function validateUsername(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (trimmed.length < 3) return 'Username must be at least 3 characters.';
+  if (trimmed.length > 24) return 'Username must be 24 characters or fewer.';
+  if (!USERNAME_REGEX.test(trimmed)) return 'Username may only contain letters, numbers, and underscores.';
+  return null;
 }
 
-// Pre-compute once at module load (avoids recomputing on every button tap).
-const REDIRECT_URL = Platform.OS === 'web' ? '' : buildRedirectUrl();
-
-console.log('[Auth] Runtime:', RUNTIME);
+// ─── Friendly auth error messages ────────────────────────────────────────────
+function friendlyAuthError(raw: string): string {
+  const msg = raw.toLowerCase();
+  if (msg.includes('invalid login credentials') || msg.includes('invalid credentials')) {
+    return 'Incorrect email or password.';
+  }
+  if (msg.includes('email not confirmed')) {
+    return 'Check your email to confirm your account, then return and sign in.';
+  }
+  if (msg.includes('user already registered') || msg.includes('already registered')) {
+    return 'An account with this email already exists. Sign in instead.';
+  }
+  if (msg.includes('password should be at least') || msg.includes('weak password')) {
+    return 'Password must be at least 6 characters.';
+  }
+  if (msg.includes('network') || msg.includes('fetch') || msg.includes('failed to fetch')) {
+    return 'Network error. Check your connection and try again.';
+  }
+  return raw;
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+interface SignUpResult {
+  requiresConfirmation: boolean;
+}
+
 interface AuthContextValue {
   user: User | null;
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
   profileLoading: boolean;
-  isSigningIn: boolean;
-  isExpoGo: boolean;
-  signInWithGoogle: () => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, username: string) => Promise<SignUpResult>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
@@ -60,11 +63,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
-  const [isSigningIn, setIsSigningIn] = useState(false);
-
-  // Guards against the deep-link listener and openAuthSessionAsync both
-  // processing the same callback URL simultaneously.
-  const callbackHandled = useRef(false);
 
   const fetchProfile = useCallback(async (userId: string) => {
     setProfileLoading(true);
@@ -78,21 +76,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.warn('[Auth] Profile fetch error:', error.message);
         setProfile(null);
       } else {
-        setProfile(data as Profile ?? null);
+        setProfile((data as Profile) ?? null);
       }
     } finally {
       setProfileLoading(false);
     }
   }, []);
 
-  // ─── Session init + auth state subscription ─────────────────────────────
+  // ─── Session init + auth state subscription ──────────────────────────────
   useEffect(() => {
     if (!isSupabaseConfigured) {
       setLoading(false);
       return;
     }
 
-    supabase.auth.getSession()
+    supabase.auth
+      .getSession()
       .then(({ data: { session: s } }) => {
         setSession(s);
         setUser(s?.user ?? null);
@@ -105,7 +104,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false);
       });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
       setUser(s?.user ?? null);
       if (s?.user) fetchProfile(s.user.id);
@@ -115,146 +116,82 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, [fetchProfile]);
 
-  // ─── Native deep-link fallback ───────────────────────────────────────────
-  // Fires only when the app is cold-started from the OAuth redirect.
-  // openAuthSessionAsync intercepts the URL in the normal flow, so this
-  // handler is a safety net. The callbackHandled ref prevents duplicates.
-  useEffect(() => {
-    if (!isSupabaseConfigured || Platform.OS === 'web' || IS_EXPO_GO) return;
-
-    const sub = Linking.addEventListener('url', async ({ url }) => {
-      if (!url.includes('auth/callback')) return;
-      if (callbackHandled.current) {
-        console.log('[Auth] Callback skipped — duplicate handler');
-        return;
-      }
-      callbackHandled.current = true;
-      console.log('[Auth] Deep-link fallback received');
-
-      const fragment = url.split('#')[1] ?? '';
-      const params = new URLSearchParams(fragment);
-      const hasAccessToken = !!params.get('access_token');
-      const hasRefreshToken = !!params.get('refresh_token');
-      console.log('[Auth] has access_token:', hasAccessToken, '| has refresh_token:', hasRefreshToken);
-
-      if (hasAccessToken && hasRefreshToken) {
-        const { error } = await supabase.auth.setSession({
-          access_token: params.get('access_token')!,
-          refresh_token: params.get('refresh_token')!,
-        });
-        console.log('[Auth] setSession called (deep-link):', error ? `error — ${error.message}` : 'ok');
-        if (error) console.warn('[Auth] Deep-link setSession error:', error.message);
-      }
-    });
-    return () => sub.remove();
-  }, []);
-
-  // ─── signInWithGoogle ────────────────────────────────────────────────────
-  const signInWithGoogle = async () => {
-    // ── Expo Go guard ────────────────────────────────────────────────────
-    if (IS_EXPO_GO && Platform.OS !== 'web') {
-      throw new Error(
-        'Google sign-in requires the MacroCarry development build, not Expo Go. ' +
-        'Build and install the dev APK with EAS, then sign in.'
-      );
-    }
-
-    setIsSigningIn(true);
-    callbackHandled.current = false;
-
-    try {
-      const redirectTo =
-        Platform.OS === 'web' ? `${window.location.origin}/auth/callback` : REDIRECT_URL;
-
-      console.log('[Auth] Runtime:', RUNTIME);
-      console.log('[Auth] redirectTo scheme/host/path:', (() => {
-        try { const u = new URL(redirectTo); return `${u.protocol}//${u.host}${u.pathname}`; } catch { return redirectTo; }
-      })());
-
-      if (Platform.OS === 'web') {
-        // ── WEB ──────────────────────────────────────────────────────────
-        // Full-page redirect; detectSessionInUrl:true picks up the session
-        // automatically when the browser lands on /auth/callback.
-        const { error } = await supabase.auth.signInWithOAuth({
-          provider: 'google',
-          options: { redirectTo },
-        });
-        if (error) {
-          console.warn('[Auth] signInWithOAuth error:', error.message);
-          throw error;
-        }
-        // Page navigates away — setIsSigningIn stays true intentionally
-        // (component will unmount). No finally reset needed for the web path.
-        return;
-      }
-
-      // ── NATIVE (dev/prod build) ───────────────────────────────────────
-      // Implicit flow: tokens arrive in the URL fragment (#access_token=…).
-      // skipBrowserRedirect:true returns the OAuth URL so we open it ourselves.
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo, skipBrowserRedirect: true },
-      });
-      if (error) {
-        console.warn('[Auth] signInWithOAuth error:', error.message);
-        throw error;
-      }
-      if (!data?.url) throw new Error('No OAuth URL returned from Supabase');
-
-      try { console.log('[Auth] OAuth URL hostname:', new URL(data.url).hostname); } catch {}
-
-      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo, {
-        showInRecents: true,
-      });
-
-      console.log('[Auth] WebBrowser result type:', result.type);
-
-      if (result.type !== 'success' || !result.url) {
-        // User cancelled or browser was dismissed — clear loading, do nothing.
-        return;
-      }
-
-      if (callbackHandled.current) {
-        console.log('[Auth] Callback skipped — already handled by deep-link listener');
-        return;
-      }
-      callbackHandled.current = true;
-
-      // Log safe URL parts only — never log the full URL or fragments.
-      try {
-        const cb = new URL(result.url);
-        console.log('[Auth] Callback scheme:', cb.protocol, '| host:', cb.hostname, '| path:', cb.pathname);
-      } catch {}
-
-      const fragment = result.url.split('#')[1] ?? '';
-      const params = new URLSearchParams(fragment);
-      const access_token = params.get('access_token');
-      const refresh_token = params.get('refresh_token');
-      const code = params.get('code') ?? new URLSearchParams(result.url.split('?')[1] ?? '').get('code');
-
-      console.log('[Auth] has access_token:', !!access_token);
-      console.log('[Auth] has refresh_token:', !!refresh_token);
-      console.log('[Auth] has code param:', !!code);
-
-      if (!access_token || !refresh_token) {
-        throw new Error(
-          'No tokens in OAuth callback. ' +
-          'Ensure mobile://auth/callback is in Supabase Redirect URLs and ' +
-          'you are running a development build, not Expo Go.'
-        );
-      }
-
-      const { error: sessionError } = await supabase.auth.setSession({ access_token, refresh_token });
-      console.log('[Auth] setSession called:', sessionError ? `error — ${sessionError.message}` : 'ok');
-      if (sessionError) throw sessionError;
-      // onAuthStateChange fires automatically with the new session.
-
-    } finally {
-      // Always clear signing-in state — covers success, cancel, and all errors.
-      setIsSigningIn(false);
-    }
+  // ─── signIn ───────────────────────────────────────────────────────────────
+  const signIn = async (email: string, password: string): Promise<void> => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw new Error(friendlyAuthError(error.message));
+    // onAuthStateChange fires automatically and updates user/session/profile.
   };
 
+  // ─── signUp ───────────────────────────────────────────────────────────────
+  const signUp = async (
+    email: string,
+    password: string,
+    username: string,
+  ): Promise<SignUpResult> => {
+    const trimmed = username.trim();
+
+    // Client-side username format is validated by the register screen before
+    // this is called, but we re-check here as a safety net.
+    const usernameError = validateUsername(trimmed);
+    if (usernameError) throw new Error(usernameError);
+
+    // Pre-flight: check username availability (case-insensitive).
+    // Uses ilike which maps to a case-insensitive LIKE on the profiles table.
+    const { data: existing, error: lookupError } = await supabase
+      .from('profiles')
+      .select('id')
+      .ilike('username', trimmed)
+      .maybeSingle();
+
+    if (lookupError && lookupError.code !== 'PGRST116') {
+      throw new Error(`Username check failed: ${lookupError.message}`);
+    }
+    if (existing) throw new Error('Username is already taken. Please choose another.');
+
+    // Create the auth user. Username travels in options.data so the DB trigger
+    // (migration 001) can read it from raw_user_meta_data.
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { username: trimmed } },
+    });
+    if (error) throw new Error(friendlyAuthError(error.message));
+
+    // If a session was returned (email confirmation is disabled), seed a
+    // minimal profile row now so:
+    //   (a) the username is persisted immediately, and
+    //   (b) daily_calorie_goal = 0 causes index.tsx to route to onboarding,
+    //       where the user sets their real goals via updateProfile upsert.
+    //
+    // If no session (email confirmation required), the DB trigger in migration
+    // 001 will create the profile row with the username once applied. Until
+    // then, profile will be null after the first sign-in, and onboarding will
+    // create the profile (username arrives via user.user_metadata.username).
+    if (data.session && data.user) {
+      const { error: profileError } = await supabase.from('profiles').insert({
+        id: data.user.id,
+        email: data.user.email!,
+        username: trimmed,
+        daily_calorie_goal: 0,
+        protein_goal_g: 0,
+        carbs_goal_g: 0,
+        fat_goal_g: 0,
+        fiber_goal_g: 0,
+        sugar_goal_g: 0,
+        sodium_goal_mg: 0,
+        carryover_enabled: true,
+      });
+      // 23505 = unique_violation — DB trigger already inserted the row; ignore.
+      if (profileError && profileError.code !== '23505') {
+        throw new Error(`Profile creation failed: ${profileError.message}`);
+      }
+    }
+
+    return { requiresConfirmation: !data.session };
+  };
+
+  // ─── signOut ──────────────────────────────────────────────────────────────
   const signOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
@@ -278,12 +215,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{
-      user, session, profile, loading, profileLoading,
-      isSigningIn, isExpoGo: IS_EXPO_GO,
-      signInWithGoogle, signOut, refreshProfile, updateProfile,
-      isConfigured: isSupabaseConfigured,
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        session,
+        profile,
+        loading,
+        profileLoading,
+        signIn,
+        signUp,
+        signOut,
+        refreshProfile,
+        updateProfile,
+        isConfigured: isSupabaseConfigured,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -1,0 +1,109 @@
+Replace the current Google OAuth login with Supabase email-and-password authentication.
+
+This is Phase 1 only.
+
+Do not:
+- implement biometrics yet
+- build another EAS APK
+- change Google Cloud
+- change Supabase redirect URLs
+- change the app scheme
+- modify unrelated food tracking, onboarding, sharing, or navigation features
+- uninstall OAuth packages yet
+
+Required result:
+
+1. Account creation screen
+   Fields:
+   - Username
+   - Email
+   - Password
+   - Confirm password
+
+2. Login screen
+   Fields:
+   - Email
+   - Password
+
+3. Username rules
+   - Username is the public MacroCarry identity.
+   - Email remains the actual Supabase login credential.
+   - Do not create a custom username-to-email login system.
+   - Trim usernames.
+   - Allow only letters, numbers, and underscores.
+   - Require 3–24 characters.
+   - Enforce case-insensitive uniqueness.
+
+4. Supabase authentication
+   - Sign up with supabase.auth.signUp().
+   - Include username in options.data during signup.
+   - Sign in with supabase.auth.signInWithPassword().
+   - Preserve Supabase session persistence.
+   - Preserve sign out.
+   - Do not call signInWithOAuth anywhere in the active login path.
+   - Do not use WebBrowser, AuthSession, redirectTo, PKCE callback processing, or mobile:// for email/password login.
+
+5. Existing authentication code
+   - Remove the Google button from the visible login screen.
+   - Remove the Expo Go Google-login warning.
+   - Remove signInWithGoogle from the active AuthContext API.
+   - Remove Google OAuth loading and callback logic from the active execution path.
+   - Do not delete dependencies until confirming they are unused elsewhere.
+
+6. Profile storage
+   - Inspect the existing Supabase profiles table, migrations, and profile-loading code before changing anything.
+   - Reuse the existing profiles table if present.
+   - Add a username column only if one does not already exist.
+   - Preserve all existing profile fields and sharing functionality.
+   - Do not overwrite or delete existing users.
+   - Existing users without a username may remain nullable and should be prompted to choose one later.
+   - New registrations must provide a username.
+   - Use a case-insensitive unique database constraint or index.
+
+7. Profile creation
+   - Pass the username through auth user metadata during signUp.
+   - Use the project’s existing profile-creation mechanism if one exists.
+   - If none exists, create an idempotent Supabase SQL migration that creates the profile safely from the new auth user.
+   - Follow existing RLS policies and do not weaken database access.
+   - If database access is unavailable from Replit, create the migration file but do not pretend it was applied.
+
+8. Email confirmation
+   - Detect whether signUp returns an active session.
+   - If no session is returned, show:
+     “Check your email to confirm your account, then return and sign in.”
+   - Do not add a new mobile deep-link flow during this phase.
+   - Do not disable email confirmation automatically.
+
+9. Error handling
+   Provide clear messages for:
+   - invalid email or password
+   - passwords not matching
+   - weak password
+   - invalid username
+   - username already taken
+   - email confirmation required
+   - network failure
+   - database/profile creation failure
+
+   Every loading state must reset through a finally block.
+   No failure may produce an infinite spinner.
+
+10. Compatibility
+   - The completed email/password flow must work in Expo Go.
+   - It must also work in Replit web simulation and Android simulation.
+   - Do not block authentication based on Constants.expoGoConfig.
+
+11. Verification
+   Run:
+   - TypeScript checks
+   - lint checks
+   - existing tests
+
+   Then report only:
+   - files changed
+   - whether a database migration was created
+   - whether that migration was actually applied
+   - whether Google OAuth remains reachable anywhere
+   - one exact test sequence for creating and signing into an account
+
+If I must perform a manual Supabase action, stop and give me exactly one action to perform.

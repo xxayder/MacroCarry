@@ -4,6 +4,7 @@ export type FoodSource = 'open_food_facts' | 'manual' | 'copied';
 export interface Profile {
   id: string;
   email: string;
+  username: string | null;
   display_name: string | null;
   daily_calorie_goal: number;
   protein_goal_g: number;
