@@ -34,7 +34,7 @@ export default function RegisterScreen() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [confirmed, setConfirmed] = useState(false); // email-confirmation pending
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
 
   const validate = (): string | null => {
     const trimmedUsername = username.trim();
@@ -64,7 +64,7 @@ export default function RegisterScreen() {
         username.trim(),
       );
       if (requiresConfirmation) {
-        setConfirmed(true);
+        setPendingEmail(email.trim());
       } else {
         router.replace('/');
       }
@@ -75,18 +75,32 @@ export default function RegisterScreen() {
     }
   };
 
-  // ── Email confirmation pending ──────────────────────────────────────────
-  if (confirmed) {
+  // ── Email-confirmation pending screen ────────────────────────────────────
+  // Uses NEUTRAL wording: Supabase returns HTTP 200 for both new accounts AND
+  // repeated signups with an existing email when confirmation is required, so
+  // we cannot confirm whether an account was actually created.
+  if (pendingEmail) {
     return (
-      <View style={[styles.confirmWrap, { backgroundColor: colors.background, paddingTop: insets.top + 40, paddingBottom: insets.bottom + 32 }]}>
+      <View
+        style={[
+          styles.confirmWrap,
+          {
+            backgroundColor: colors.background,
+            paddingTop: insets.top + 40,
+            paddingBottom: insets.bottom + 32,
+          },
+        ]}
+      >
         <View style={[styles.confirmIcon, { backgroundColor: colors.primarySubtle }]}>
           <Feather name="mail" size={32} color={colors.primary} />
         </View>
         <Text style={[styles.confirmTitle, { color: colors.text }]}>Check your email</Text>
         <Text style={[styles.confirmBody, { color: colors.textSecondary }]}>
-          We sent a confirmation link to{'\n'}
-          <Text style={[styles.confirmEmail, { color: colors.text }]}>{email.trim()}</Text>
-          {'\n\n'}Open the link, then return here and sign in.
+          If{' '}
+          <Text style={[styles.confirmEmail, { color: colors.text }]}>{pendingEmail}</Text>
+          {' '}can be registered, a confirmation link has been sent.
+          {'\n\n'}
+          If you already have an account, sign in instead or reset your password.
         </Text>
         <TouchableOpacity
           style={[styles.btn, { backgroundColor: colors.primary }]}
@@ -126,7 +140,15 @@ export default function RegisterScreen() {
         {/* Form */}
         <View style={styles.form}>
           {error && (
-            <View style={[styles.errorBox, { backgroundColor: colors.destructive + '18', borderColor: colors.destructive + '40' }]}>
+            <View
+              style={[
+                styles.errorBox,
+                {
+                  backgroundColor: colors.destructive + '18',
+                  borderColor: colors.destructive + '40',
+                },
+              ]}
+            >
               <Feather name="alert-circle" size={14} color={colors.destructive} style={{ marginTop: 1 }} />
               <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
             </View>
@@ -135,7 +157,12 @@ export default function RegisterScreen() {
           {/* Username */}
           <View style={styles.fieldGroup}>
             <Text style={[styles.label, { color: colors.textSecondary }]}>Username</Text>
-            <View style={[styles.inputRow, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+            <View
+              style={[
+                styles.inputRow,
+                { borderColor: colors.border, backgroundColor: colors.surface },
+              ]}
+            >
               <Feather name="at-sign" size={16} color={colors.textMuted} />
               <TextInput
                 style={[styles.input, { color: colors.text }]}
@@ -158,7 +185,12 @@ export default function RegisterScreen() {
           {/* Email */}
           <View style={styles.fieldGroup}>
             <Text style={[styles.label, { color: colors.textSecondary }]}>Email</Text>
-            <View style={[styles.inputRow, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+            <View
+              style={[
+                styles.inputRow,
+                { borderColor: colors.border, backgroundColor: colors.surface },
+              ]}
+            >
               <Feather name="mail" size={16} color={colors.textMuted} />
               <TextInput
                 ref={emailRef}
@@ -180,7 +212,12 @@ export default function RegisterScreen() {
           {/* Password */}
           <View style={styles.fieldGroup}>
             <Text style={[styles.label, { color: colors.textSecondary }]}>Password</Text>
-            <View style={[styles.inputRow, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+            <View
+              style={[
+                styles.inputRow,
+                { borderColor: colors.border, backgroundColor: colors.surface },
+              ]}
+            >
               <Feather name="lock" size={16} color={colors.textMuted} />
               <TextInput
                 ref={passwordRef}
@@ -197,7 +234,11 @@ export default function RegisterScreen() {
                 onSubmitEditing={() => confirmRef.current?.focus()}
               />
               <TouchableOpacity onPress={() => setShowPassword((v) => !v)} hitSlop={8}>
-                <Feather name={showPassword ? 'eye-off' : 'eye'} size={16} color={colors.textMuted} />
+                <Feather
+                  name={showPassword ? 'eye-off' : 'eye'}
+                  size={16}
+                  color={colors.textMuted}
+                />
               </TouchableOpacity>
             </View>
           </View>
@@ -205,7 +246,12 @@ export default function RegisterScreen() {
           {/* Confirm Password */}
           <View style={styles.fieldGroup}>
             <Text style={[styles.label, { color: colors.textSecondary }]}>Confirm Password</Text>
-            <View style={[styles.inputRow, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+            <View
+              style={[
+                styles.inputRow,
+                { borderColor: colors.border, backgroundColor: colors.surface },
+              ]}
+            >
               <Feather name="lock" size={16} color={colors.textMuted} />
               <TextInput
                 ref={confirmRef}
@@ -222,14 +268,24 @@ export default function RegisterScreen() {
                 onSubmitEditing={handleRegister}
               />
               <TouchableOpacity onPress={() => setShowConfirm((v) => !v)} hitSlop={8}>
-                <Feather name={showConfirm ? 'eye-off' : 'eye'} size={16} color={colors.textMuted} />
+                <Feather
+                  name={showConfirm ? 'eye-off' : 'eye'}
+                  size={16}
+                  color={colors.textMuted}
+                />
               </TouchableOpacity>
             </View>
           </View>
 
           {/* Submit */}
           <TouchableOpacity
-            style={[styles.btn, { backgroundColor: colors.primary, opacity: loading || !isConfigured ? 0.7 : 1 }]}
+            style={[
+              styles.btn,
+              {
+                backgroundColor: colors.primary,
+                opacity: loading || !isConfigured ? 0.7 : 1,
+              },
+            ]}
             onPress={handleRegister}
             disabled={loading || !isConfigured}
             activeOpacity={0.8}
@@ -259,11 +315,24 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   container: { paddingHorizontal: 28, gap: 28 },
   brand: { alignItems: 'center', gap: 10 },
-  logoBox: { width: 80, height: 80, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  logoBox: {
+    width: 80,
+    height: 80,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   appName: { fontSize: 30, fontFamily: 'Inter_700Bold' },
   tagline: { fontSize: 14, fontFamily: 'Inter_400Regular' },
   form: { gap: 14 },
-  errorBox: { flexDirection: 'row', gap: 8, padding: 12, borderRadius: 10, borderWidth: 1, alignItems: 'flex-start' },
+  errorBox: {
+    flexDirection: 'row',
+    gap: 8,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'flex-start',
+  },
   errorText: { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 19 },
   fieldGroup: { gap: 5 },
   label: { fontSize: 13, fontFamily: 'Inter_500Medium' },
@@ -290,9 +359,26 @@ const styles = StyleSheet.create({
   footerText: { fontSize: 14, fontFamily: 'Inter_400Regular' },
   footerLink: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   // Confirmation screen
-  confirmWrap: { flex: 1, paddingHorizontal: 32, alignItems: 'center', justifyContent: 'center', gap: 20 },
-  confirmIcon: { width: 80, height: 80, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  confirmWrap: {
+    flex: 1,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 20,
+  },
+  confirmIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   confirmTitle: { fontSize: 24, fontFamily: 'Inter_700Bold', textAlign: 'center' },
-  confirmBody: { fontSize: 15, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 24 },
+  confirmBody: {
+    fontSize: 15,
+    fontFamily: 'Inter_400Regular',
+    textAlign: 'center',
+    lineHeight: 24,
+  },
   confirmEmail: { fontFamily: 'Inter_600SemiBold' },
 });

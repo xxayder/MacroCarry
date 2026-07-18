@@ -23,6 +23,7 @@ export default function SettingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [saving, setSaving] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   const [calories, setCalories] = useState('');
   const [protein, setProtein] = useState('');
@@ -84,9 +85,27 @@ export default function SettingsScreen() {
   };
 
   const handleSignOut = () => {
+    if (signingOut) return;
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign Out', style: 'destructive', onPress: signOut },
+      {
+        text: 'Sign Out',
+        style: 'destructive',
+        onPress: async () => {
+          setSigningOut(true);
+          try {
+            await signOut();
+            // Route guard in index.tsx will redirect to login once user is null.
+          } catch (err: any) {
+            // signOut clears local state before throwing, so the user IS signed
+            // out on this device — this error only means the server revocation
+            // failed (e.g. a network issue). Show it so the user is aware.
+            Alert.alert('Sign Out Issue', err.message ?? 'Signed out, but the server could not be notified. You are signed out on this device.');
+          } finally {
+            setSigningOut(false);
+          }
+        },
+      },
     ]);
   };
 
@@ -184,12 +203,19 @@ export default function SettingsScreen() {
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={[styles.signOutBtn, { borderColor: colors.destructive + '55' }]}
+        style={[styles.signOutBtn, { borderColor: colors.destructive + '55', opacity: signingOut ? 0.6 : 1 }]}
         onPress={handleSignOut}
+        disabled={signingOut}
         activeOpacity={0.8}
       >
-        <Feather name="log-out" size={16} color={colors.destructive} />
-        <Text style={[styles.signOutText, { color: colors.destructive }]}>Sign Out</Text>
+        {signingOut ? (
+          <ActivityIndicator size="small" color={colors.destructive} />
+        ) : (
+          <>
+            <Feather name="log-out" size={16} color={colors.destructive} />
+            <Text style={[styles.signOutText, { color: colors.destructive }]}>Sign Out</Text>
+          </>
+        )}
       </TouchableOpacity>
     </ScrollView>
   );
