@@ -1,0 +1,197 @@
+Prepare and build MacroCarry’s first Google Play Internal Testing release.
+
+This task is release preparation only.
+
+Do not:
+
+- add features
+- restore biometrics
+- change authentication behavior
+- change Supabase tables, migrations, triggers, or RLS
+- change working nutrition, sharing, onboarding, or profile logic
+- restore Google OAuth
+- perform a broad refactor
+- submit directly to Google Play
+- expose or print credentials, environment values, signing keys, tokens, or Supabase keys
+
+Goal:
+
+Produce a signed Android App Bundle (.aab) suitable for manual upload to Google Play Internal Testing.
+
+PHASE 1 — VERIFY PROJECT IDENTITY
+
+Confirm and preserve:
+
+- App name: MacroCarry
+- Android package: com.macrocarry.app
+- Expo scheme: mobile
+- Platform: Android
+- First public version: 1.0.0
+- Android versionCode: valid and unique
+- Existing EAS project linkage
+
+Check whether extra.eas.projectId exists in the Expo app configuration.
+
+If the project is not linked to EAS, use the existing EXPO_TOKEN and configure the EAS project without exposing the token.
+
+Do not change the Android package name. The package name must permanently remain:
+
+com.macrocarry.app
+
+PHASE 2 — VERIFY PRODUCTION BUILD CONFIGURATION
+
+Inspect eas.json.
+
+Ensure the production profile:
+
+- does not use developmentClient
+- uses distribution: "store"
+- produces an Android App Bundle
+- uses the production EAS environment
+- auto-increments Android versionCode
+- does not depend on Metro or Expo Go
+- does not include development-only behavior
+
+Use the equivalent of:
+
+{
+  "cli": {
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "production": {
+      "distribution": "store",
+      "environment": "production",
+      "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle"
+      }
+    }
+  }
+}
+
+Preserve any valid existing settings that are still needed.
+
+Do not alter the development build profile unless it prevents the production build.
+
+PHASE 3 — VERIFY EXPO AND ANDROID COMPATIBILITY
+
+Report:
+
+- installed Expo SDK version
+- React Native version
+- Android compile SDK
+- Android target SDK
+- minimum Android SDK
+- whether New Architecture is enabled
+- whether edge-to-edge layout is enabled
+
+A target SDK of at least API 35 is required for submission now.
+
+API 36 is preferred if the current Expo SDK already supports it.
+
+Do not perform a major Expo SDK upgrade solely for this build without first reporting that it is necessary. Do not create unnecessary upgrade risk.
+
+PHASE 4 — VERIFY PRODUCTION ENVIRONMENT VARIABLES
+
+Inspect which exact environment-variable names the Supabase client reads.
+
+Confirm that the required public Supabase values exist in the EAS production environment, not only in Replit Secrets.
+
+Likely variables include one of these combinations:
+
+- EXPO_PUBLIC_SUPABASE_URL
+- EXPO_PUBLIC_SUPABASE_ANON_KEY
+
+or:
+
+- EXPO_PUBLIC_SUPABASE_URL
+- EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+
+Use the names actually referenced by the current source code.
+
+Requirements:
+
+- production EAS build must receive the correct Supabase project URL
+- production EAS build must receive the correct public/anonymous key
+- no Supabase service-role key may appear in the mobile project
+- no Google OAuth client secret may appear in the mobile project
+- no Replit development URL may be required by email/password login
+- do not print environment values in the report or build logs
+
+If the required EAS production variables are missing and you cannot safely add them without exposing their values, stop and give me exactly one manual action.
+
+PHASE 5 — RELEASE ASSET AND CONFIGURATION AUDIT
+
+Verify that the project contains valid production assets for:
+
+- application icon
+- Android adaptive icon foreground
+- Android adaptive icon background
+- splash screen
+- app display name
+
+Check the generated Android permissions.
+
+Report any permissions that appear unrelated to the current application, but do not remove permissions unless they are clearly left over from the abandoned biometric or Google OAuth features.
+
+Confirm there are no remaining active biometric dependencies, permissions, settings, or UI.
+
+Confirm there are no active Google OAuth callback handlers, WebBrowser login flows, or Expo Go guards affecting email/password authentication.
+
+PHASE 6 — PREFLIGHT CHECKS
+
+Run:
+
+- npx expo-doctor
+- TypeScript check
+- lint check if a lint script exists
+- Expo production export or bundle validation if appropriate
+
+Do not claim the checks passed if existing errors remain.
+
+Do not rewrite unrelated files merely to make the report appear clean.
+
+Fix only problems that prevent the production Android build from compiling or launching.
+
+PHASE 7 — CREATE THE ANDROID APP BUNDLE
+
+Use the EXPO_TOKEN already stored in the Replit environment.
+
+Verify authentication with:
+
+npx eas-cli@latest whoami
+
+Then build:
+
+npx eas-cli@latest build --platform android --profile production
+
+Allow EAS to generate and securely manage the Android upload keystore if this project does not already have one.
+
+Do not:
+
+- expose the keystore
+- commit credentials
+- use --auto-submit
+- configure a Google service account yet
+- upload anything to Google Play automatically
+
+If EAS requires a manual confirmation or account action, stop and give me exactly one action to perform.
+
+PHASE 8 — REPORT
+
+After the build completes, report only:
+
+1. Whether the build succeeded.
+2. EAS build ID.
+3. App name.
+4. Android package.
+5. Version name.
+6. Version code.
+7. Target API level.
+8. Whether EAS manages the upload keystore.
+9. Location of the downloadable .aab.
+10. Any warnings that could affect Google Play.
+11. Exact files changed.
+12. Whether production Supabase configuration was verified.
+13. Whether the .aab is ready for manual Internal Testing upload.
