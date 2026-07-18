@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Platform,
   ScrollView,
   StyleSheet,
   Switch,
@@ -16,19 +15,15 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/context/AuthContext';
-import { useBiometric } from '@/context/BiometricContext';
 import { useColors } from '@/hooks/useColors';
 import { validateMacros } from '@/lib/utils';
 
 export default function SettingsScreen() {
   const { profile, updateProfile, signOut } = useAuth();
-  const { isBiometricEnabled, enableBiometrics, disableBiometrics } = useBiometric();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [saving, setSaving] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
-  // Biometric toggle loading — isolated from all other loading states.
-  const [togglingBiometric, setTogglingBiometric] = useState(false);
 
   const [calories, setCalories] = useState('');
   const [protein, setProtein] = useState('');
@@ -102,6 +97,9 @@ export default function SettingsScreen() {
             await signOut();
             // Route guard in index.tsx will redirect to login once user is null.
           } catch (err: any) {
+            // signOut clears local state before throwing, so the user IS signed
+            // out on this device — this error only means the server revocation
+            // failed (e.g. a network issue). Show it so the user is aware.
             Alert.alert('Sign Out Issue', err.message ?? 'Signed out, but the server could not be notified. You are signed out on this device.');
           } finally {
             setSigningOut(false);
@@ -109,29 +107,6 @@ export default function SettingsScreen() {
         },
       },
     ]);
-  };
-
-  /**
-   * Toggle handler for the Biometric Unlock switch.
-   * Uses a dedicated loading state so it never interferes with save/sign-out.
-   */
-  const handleBiometricToggle = async (value: boolean) => {
-    if (togglingBiometric) return;
-    setTogglingBiometric(true);
-    try {
-      if (value) {
-        await enableBiometrics();
-      } else {
-        await disableBiometrics();
-      }
-    } catch (err: any) {
-      // Do not alert on plain cancellation — user deliberately tapped cancel.
-      if (err.message && err.message !== 'Cancelled.') {
-        Alert.alert('Biometric Unlock', err.message);
-      }
-    } finally {
-      setTogglingBiometric(false);
-    }
   };
 
   if (!profile) return null;
@@ -200,31 +175,7 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      {/* Security — native only (web has no biometric hardware) */}
-      {Platform.OS !== 'web' && (
-        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>SECURITY</Text>
-          <View style={styles.switchRow}>
-            <View style={styles.switchLeft}>
-              <Text style={[styles.fieldLabel, { color: colors.text }]}>Biometric Unlock</Text>
-              <Text style={[styles.switchHint, { color: colors.textMuted }]}>
-                Use Face ID or fingerprint to open the app
-              </Text>
-            </View>
-            {togglingBiometric ? (
-              <ActivityIndicator size="small" color={colors.primary} />
-            ) : (
-              <Switch
-                value={isBiometricEnabled}
-                onValueChange={handleBiometricToggle}
-                trackColor={{ true: colors.primary }}
-              />
-            )}
-          </View>
-        </View>
-      )}
-
-      {/* Sharing navigation */}
+      {/* Navigation */}
       <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>SHARING</Text>
         <NavRow

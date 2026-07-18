@@ -1,0 +1,125 @@
+Remove the biometric-unlock feature completely.
+
+This is a surgical rollback. Preserve the current stable Supabase email/password authentication and persistent-session behavior.
+
+The intended authentication experience is:
+
+- The user signs in once.
+- Supabase restores the session automatically whenever the app reopens.
+- The user remains signed in indefinitely unless they explicitly sign out or the session becomes invalid.
+- No fingerprint, face scan, app lock screen, or repeated authentication prompt is needed.
+
+Do not revert or modify these working features:
+
+- email/password registration
+- email/password login
+- username availability RPC
+- duplicate-username handling
+- persistent sign-in after app restart
+- reliable local sign-out
+- signed-out state persisting after restart
+- React Query cache clearing on sign-out
+- profile loading
+- neutral duplicate-email messaging
+- Supabase session storage
+- onboarding, nutrition tracking, sharing, or unrelated navigation
+- Expo/EAS or Google Play configuration
+
+Remove only the biometric feature.
+
+Required changes:
+
+1. Delete these biometric-only files:
+
+- lib/biometrics.ts
+- context/BiometricContext.tsx
+- components/BiometricLockScreen.tsx
+
+2. Update app/_layout.tsx:
+
+- Remove BiometricProvider.
+- Remove BiometricGate.
+- Remove biometric initialization and lock-state logic.
+- Render the existing navigation through AuthProvider normally.
+- Preserve QueryClientProvider, AuthProvider, routing, fonts, error handling, and all unrelated startup logic.
+- Authenticated screens must open immediately after the stored Supabase session is restored.
+
+3. Update app/(tabs)/settings.tsx:
+
+- Remove the Biometric Unlock section.
+- Remove biometric switches, handlers, state variables, loading indicators, imports, text, and prompts.
+- Preserve the existing repaired Sign Out behavior.
+
+4. Update context/AuthContext.tsx:
+
+- Remove clearBiometricPreference imports and calls.
+- Remove biometric-related state or cleanup only.
+- Preserve:
+  - supabase.auth.signOut({ scope: 'local' })
+  - user/session/profile clearing
+  - queryClient.clear()
+  - sign-out error handling
+  - session persistence
+  - onAuthStateChange
+  - profile loading
+  - sign-up and sign-in behavior
+
+5. Search the entire repository for:
+
+- biometric
+- Biometric
+- LocalAuthentication
+- SecureStore
+- expo-local-authentication
+- macrocarry_biometric_enabled
+- macrocarry_biometric_user_id
+
+Remove all references belonging to the abandoned biometric feature.
+
+6. Dependencies:
+
+- Remove expo-local-authentication if it has no other usage.
+- Remove expo-secure-store only if a repository-wide search confirms nothing else uses it.
+- Do not remove packages used by Supabase session persistence or another feature.
+- Use Expo-compatible uninstall commands.
+
+7. Native configuration:
+
+- Remove biometric-related config-plugin or permission entries only if they were added specifically for this feature.
+- Preserve:
+  - Android package com.macrocarry.app
+  - app scheme mobile
+  - expo-dev-client
+  - eas.json
+  - all Google Play build configuration
+
+8. Verify this exact behavior:
+
+- Sign in successfully.
+- Fully close and reopen the app.
+- User remains signed in and opens directly into the app.
+- Sign out.
+- Fully close and reopen the app.
+- User remains signed out and sees the login screen.
+- No biometric screen, blank biometric gate, biometric prompt, or biometric setting remains.
+- No authenticated data briefly flashes during normal auth initialization.
+- No infinite loading state appears.
+
+9. Run:
+
+- repository-wide search for remaining biometric references
+- TypeScript checks
+- lint checks
+- Metro bundle/start verification
+
+Report only:
+
+1. Files deleted.
+2. Files modified.
+3. Packages removed or retained and why.
+4. Confirmation that no biometric feature remains active.
+5. Confirmation that persistent sign-in and reliable sign-out were preserved.
+6. Remaining TypeScript or lint errors.
+
+Do not add any replacement authentication feature.
+Do not begin another convenience feature.

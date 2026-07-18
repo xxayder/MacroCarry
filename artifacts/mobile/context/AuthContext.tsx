@@ -2,7 +2,6 @@ import type { Session, User } from '@supabase/supabase-js';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
 import { queryClient } from '@/lib/queryClient';
-import { clearBiometricPreference } from '@/lib/biometrics';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import type { Profile } from '@/types';
 
@@ -229,10 +228,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(null);
     setProfile(null);
     queryClient.clear();
-    // Remove biometric preference from SecureStore so the next cold start
-    // (for this or any other user) does not show the lock screen.
-    // BiometricContext's sign-out effect clears in-memory state separately.
-    await clearBiometricPreference();
 
     if (error) throw new Error(error.message);
     // onAuthStateChange fires SIGNED_OUT and clears state too (redundant but fine).

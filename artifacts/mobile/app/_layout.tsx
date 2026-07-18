@@ -9,15 +9,12 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import React, { useEffect } from 'react';
-import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { BiometricLockScreen } from '@/components/BiometricLockScreen';
 import { AuthProvider } from '@/context/AuthContext';
-import { BiometricProvider, useBiometric } from '@/context/BiometricContext';
 import { useColors } from '@/hooks/useColors';
 import { queryClient } from '@/lib/queryClient';
 
@@ -78,37 +75,6 @@ function RootLayoutNav() {
   );
 }
 
-/**
- * BiometricGate — prevents authenticated content from rendering until the
- * biometric lock decision has been made.
- *
- * While initializing (SecureStore or auth still loading):
- *   → Shows a blank screen matching the app background. No content flash.
- *
- * When locked:
- *   → Shows BiometricLockScreen, which covers the entire display.
- *   → RootLayoutNav (and all routes inside it) never mounts.
- *
- * When unlocked:
- *   → Shows RootLayoutNav normally.
- */
-function BiometricGate({ children }: { children: React.ReactNode }) {
-  const { isLocked, initializing } = useBiometric();
-  const colors = useColors();
-
-  if (initializing) {
-    // Blank screen — same background color as the rest of the app.
-    // This window lasts only until SecureStore and auth INITIAL_SESSION both resolve.
-    return <View style={{ flex: 1, backgroundColor: colors.background }} />;
-  }
-
-  if (isLocked) {
-    return <BiometricLockScreen />;
-  }
-
-  return <>{children}</>;
-}
-
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
@@ -130,21 +96,11 @@ export default function RootLayout() {
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            {/*
-             * BiometricProvider must be inside AuthProvider so it can read
-             * the current user ID from useAuth().
-             * BiometricGate must be inside BiometricProvider to consume the
-             * context, and wraps all navigation so it can block rendering.
-             */}
-            <BiometricProvider>
-              <GestureHandlerRootView>
-                <KeyboardProvider>
-                  <BiometricGate>
-                    <RootLayoutNav />
-                  </BiometricGate>
-                </KeyboardProvider>
-              </GestureHandlerRootView>
-            </BiometricProvider>
+            <GestureHandlerRootView>
+              <KeyboardProvider>
+                <RootLayoutNav />
+              </KeyboardProvider>
+            </GestureHandlerRootView>
           </AuthProvider>
         </QueryClientProvider>
       </ErrorBoundary>
