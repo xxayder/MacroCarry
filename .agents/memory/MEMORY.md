@@ -1,0 +1,1 @@
+- [EAS build in Replit](eas-replit-build.md) — must use EAS_NO_VCS=1 to bypass git lock restriction when running eas build
