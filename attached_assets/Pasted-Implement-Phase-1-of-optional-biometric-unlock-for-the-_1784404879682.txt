@@ -1,0 +1,152 @@
+Implement Phase 1 of optional biometric unlock for the existing email/password authentication system.
+
+Current verified behavior:
+
+- Account creation works.
+- Duplicate usernames are correctly rejected.
+- Sign-in persists after fully closing and reopening the app.
+- Sign-out works and remains signed out after reopening.
+- Google OAuth is abandoned and must remain inactive.
+
+Important architecture:
+
+Biometrics are a local app-unlock gate after Supabase has already restored a valid session. Biometrics must not replace Supabase authentication.
+
+Do not:
+
+- store the user’s email password
+- create a second authentication system
+- modify Supabase migrations
+- modify sign-up, sign-in, username, or email-confirmation logic
+- modify Google OAuth
+- modify EAS, redirects, app scheme, RLS, onboarding, or nutrition features
+- move or rewrite the existing Supabase session storage during this task
+- implement biometric authentication on web
+
+Requirements:
+
+1. Install or verify these Expo-compatible packages:
+
+   npx expo install expo-local-authentication expo-secure-store
+
+2. Add a “Biometric Unlock” setting in the authenticated Settings screen.
+
+3. Before allowing the setting to be enabled:
+
+   - Call LocalAuthentication.hasHardwareAsync().
+   - Call LocalAuthentication.isEnrolledAsync().
+   - If no compatible biometric hardware exists, explain that biometrics are unavailable.
+   - If no fingerprint or face data is enrolled, tell the user to configure biometrics in the phone settings.
+   - Require one successful LocalAuthentication.authenticateAsync() attempt before enabling the setting.
+
+4. Store only these values in SecureStore:
+
+   - whether biometric unlock is enabled
+   - the Supabase user ID for whom it was enabled
+
+   Do not store:
+
+   - passwords
+   - email credentials
+   - access tokens
+   - refresh tokens
+   - the Supabase session
+   - biometric data
+
+5. On a cold app launch:
+
+   - Allow Supabase to restore its existing session normally.
+   - If no valid Supabase session exists, show the normal login screen.
+   - If a valid session exists and biometric unlock is not enabled for that exact user ID, open the app normally.
+   - If a valid session exists and biometric unlock is enabled for that exact user ID, block all authenticated screens behind a dedicated biometric lock screen.
+   - Do not briefly display private user data before the lock screen appears.
+
+6. The biometric lock screen must include:
+
+   - “Unlock MacroCarry”
+   - a button to retry biometric authentication
+   - a “Use email and password instead” button
+   - a clear message after cancellation or failure
+
+7. On successful biometric authentication:
+
+   - unlock the current app session
+   - do not call signInWithPassword
+   - do not create a new Supabase session
+   - do not modify or refresh credentials unnecessarily
+
+8. On cancellation or biometric failure:
+
+   - remain on the lock screen
+   - never show authenticated app content
+   - reset all biometric loading states
+   - allow retry
+   - do not create an infinite spinner
+
+9. “Use email and password instead” must:
+
+   - call the existing reliable local sign-out function
+   - clear the biometric-enabled SecureStore values
+   - return to the normal login screen
+   - remain signed out after app restart
+
+10. Normal Sign Out must also:
+
+   - clear biometric-enabled SecureStore values
+   - clear any in-memory unlocked state
+   - preserve the already-verified sign-out behavior
+
+11. Disabling Biometric Unlock in Settings must:
+
+   - require one biometric confirmation before disabling, when possible
+   - remove the SecureStore values
+   - not sign the user out
+
+12. Account separation:
+
+   - biometric settings must be tied to the exact Supabase user ID
+   - biometric access enabled by one account must never unlock another account
+   - a different user signing in must default to biometrics disabled
+
+13. Platform behavior:
+
+   - Android/Expo Go: biometric functionality should be testable
+   - installed Android development/release build: functionality must remain compatible
+   - web: hide or disable the biometric setting and continue normal email/password authentication
+
+14. Keep biometric lock state separate from:
+
+   - AuthContext initialization loading
+   - login loading
+   - signup loading
+   - sign-out loading
+
+15. Add safe logs showing only:
+
+   - platform
+   - whether hardware exists
+   - whether biometrics are enrolled
+   - whether biometric unlock is enabled
+   - whether the stored biometric user ID matches the signed-in user
+   - biometric result success/failure/cancel
+   - whether the app is locked or unlocked
+
+   Never log credentials, tokens, passwords, session objects, or SecureStore values.
+
+16. Run:
+
+   - TypeScript checks
+   - lint checks
+   - existing tests
+
+Do not claim existing project errors were fixed unless you actually fixed them.
+
+When complete, report only:
+
+1. Files changed.
+2. Packages installed.
+3. Where the biometric preference is stored.
+4. How authenticated content is prevented from flashing before unlock.
+5. Whether normal sign-out still clears the session and biometric preference.
+6. Exact physical-device test sequence.
+7. Anything that could not be tested automatically.

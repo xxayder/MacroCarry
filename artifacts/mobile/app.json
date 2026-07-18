@@ -46,7 +46,8 @@
         {
           "cameraPermission": "Allow MacroCarry to access your camera to scan food barcodes."
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,
