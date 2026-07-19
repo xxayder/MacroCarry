@@ -17,6 +17,9 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AuthProvider } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
 import { queryClient } from '@/lib/queryClient';
+import { captureException, initSentry } from '@/lib/sentry';
+
+initSentry();
 
 SplashScreen.preventAutoHideAsync();
 
@@ -93,7 +96,7 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <ErrorBoundary>
+      <ErrorBoundary onError={(err, stack) => captureException(err, { componentStack: stack })}>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <GestureHandlerRootView>

@@ -5,9 +5,11 @@ import { ErrorFallback, ErrorFallbackProps } from "@/components/ErrorFallback";
 export type ErrorBoundaryProps = PropsWithChildren<{
   FallbackComponent?: ComponentType<ErrorFallbackProps>;
   onError?: (error: Error, stackTrace: string) => void;
+  userId?: string | null;
+  userEmail?: string | null;
 }>;
 
-type ErrorBoundaryState = { error: Error | null };
+type ErrorBoundaryState = { error: Error | null; componentStack: string | null };
 
 /**
  * This is a special case for for using the class components. Error boundaries must be class components because React only provides error boundary functionality through lifecycle methods (componentDidCatch and getDerivedStateFromError) which are not available in functional components.
@@ -17,7 +19,7 @@ export class ErrorBoundary extends Component<
   ErrorBoundaryProps,
   ErrorBoundaryState
 > {
-  state: ErrorBoundaryState = { error: null };
+  state: ErrorBoundaryState = { error: null, componentStack: null };
 
   static defaultProps: {
     FallbackComponent: ComponentType<ErrorFallbackProps>;
@@ -26,26 +28,30 @@ export class ErrorBoundary extends Component<
   };
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { error };
+    return { error, componentStack: null };
   }
 
   componentDidCatch(error: Error, info: { componentStack: string }): void {
+    this.setState({ componentStack: info.componentStack });
     if (typeof this.props.onError === "function") {
       this.props.onError(error, info.componentStack);
     }
   }
 
   resetError = (): void => {
-    this.setState({ error: null });
+    this.setState({ error: null, componentStack: null });
   };
 
   render() {
-    const { FallbackComponent } = this.props;
+    const { FallbackComponent, userId, userEmail } = this.props;
 
     return this.state.error && FallbackComponent ? (
       <FallbackComponent
         error={this.state.error}
         resetError={this.resetError}
+        componentStack={this.state.componentStack ?? undefined}
+        userId={userId}
+        userEmail={userEmail}
       />
     ) : (
       this.props.children

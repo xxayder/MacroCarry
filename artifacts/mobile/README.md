@@ -149,7 +149,48 @@ create policy "Owners can manage their share permissions"
 create policy "Shared viewers can see their shares"
   on share_permissions for select
   using (shared_with_email = (auth.jwt() ->> 'email'));
+
+-- Feedback from testers (Settings → Send feedback)
+create table feedback (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users,
+  user_email text,
+  message text not null,
+  category text not null default 'other' check (category in ('bug', 'suggestion', 'other')),
+  device_info jsonb not null default '{}',
+  created_at timestamptz not null default now()
+);
+
+alter table feedback enable row level security;
+
+-- Only authenticated users can insert their own feedback
+create policy "Users can submit feedback"
+  on feedback for insert
+  with check (auth.uid() = user_id or user_id is null);
+
+-- Crash reports captured automatically from the ErrorBoundary
+create table crash_reports (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users,
+  user_email text,
+  error_message text not null,
+  error_stack text,
+  component_stack text,
+  device_info jsonb not null default '{}',
+  created_at timestamptz not null default now()
+);
+
+alter table crash_reports enable row level security;
+
+-- Only authenticated users (or unauthenticated — best-effort) can insert
+create policy "Users can submit crash reports"
+  on crash_reports for insert
+  with check (true);
 ```
+
+> **Developer dashboard**: view tester feedback and crash reports any time in the
+> Supabase Table Editor (`feedback` and `crash_reports` tables).  
+> Sort by `created_at desc` to see the latest submissions first.
 
 ### 3. Enable Google OAuth
 

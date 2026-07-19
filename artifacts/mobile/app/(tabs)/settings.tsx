@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   ScrollView,
   StyleSheet,
   Switch,
@@ -16,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
+import { getDeviceInfo, submitFeedback } from '@/lib/feedback';
 import { validateMacros } from '@/lib/utils';
 
 export default function SettingsScreen() {
@@ -34,6 +36,11 @@ export default function SettingsScreen() {
   const [sodium, setSodium] = useState('');
   const [carryover, setCarryover] = useState(true);
   const [displayName, setDisplayName] = useState('');
+
+  const [feedbackVisible, setFeedbackVisible] = useState(false);
+  const [feedbackText, setFeedbackText] = useState('');
+  const [feedbackCategory, setFeedbackCategory] = useState<'bug' | 'suggestion' | 'other'>('bug');
+  const [sendingFeedback, setSendingFeedback] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -81,6 +88,30 @@ export default function SettingsScreen() {
       ]);
     } else {
       proceed();
+    }
+  };
+
+  const handleSendFeedback = async () => {
+    if (!feedbackText.trim()) {
+      Alert.alert('Empty message', 'Please describe your feedback before sending.');
+      return;
+    }
+    setSendingFeedback(true);
+    try {
+      await submitFeedback({
+        user_id: profile?.id ?? null,
+        user_email: profile?.email ?? null,
+        message: feedbackText.trim(),
+        category: feedbackCategory,
+        device_info: getDeviceInfo(),
+      });
+      setFeedbackText('');
+      setFeedbackVisible(false);
+      Alert.alert('Feedback sent', 'Thanks! Your feedback has been recorded.');
+    } catch {
+      Alert.alert('Could not send', 'Please try again later.');
+    } finally {
+      setSendingFeedback(false);
     }
   };
 
@@ -193,6 +224,95 @@ export default function SettingsScreen() {
         />
       </View>
 
+      {/* Feedback */}
+      <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>FEEDBACK</Text>
+        <NavRow
+          label="Send feedback"
+          icon="message-square"
+          onPress={() => setFeedbackVisible(true)}
+          colors={colors}
+        />
+      </View>
+
+      {/* Feedback modal */}
+      <Modal
+        visible={feedbackVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setFeedbackVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalSheet, { backgroundColor: colors.surface }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Send Feedback</Text>
+              <TouchableOpacity onPress={() => setFeedbackVisible(false)} hitSlop={8}>
+                <Feather name="x" size={22} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              <Text style={[styles.modalLabel, { color: colors.textSecondary }]}>CATEGORY</Text>
+              <View style={styles.categoryRow}>
+                {(['bug', 'suggestion', 'other'] as const).map((cat) => (
+                  <TouchableOpacity
+                    key={cat}
+                    style={[
+                      styles.categoryChip,
+                      {
+                        backgroundColor: feedbackCategory === cat ? colors.primary : colors.background,
+                        borderColor: feedbackCategory === cat ? colors.primary : colors.border,
+                      },
+                    ]}
+                    onPress={() => setFeedbackCategory(cat)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.categoryChipText,
+                        { color: feedbackCategory === cat ? '#fff' : colors.textSecondary },
+                      ]}
+                    >
+                      {cat === 'bug' ? '🐛 Bug' : cat === 'suggestion' ? '💡 Suggestion' : '💬 Other'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={[styles.modalLabel, { color: colors.textSecondary, marginTop: 16 }]}>DESCRIPTION</Text>
+              <TextInput
+                style={[styles.feedbackInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
+                value={feedbackText}
+                onChangeText={setFeedbackText}
+                placeholder={feedbackCategory === 'bug' ? "Describe what happened and how to reproduce it…" : "Share your thoughts…"}
+                placeholderTextColor={colors.textMuted}
+                multiline
+                numberOfLines={5}
+                textAlignVertical="top"
+                maxLength={2000}
+              />
+              <Text style={[styles.charCount, { color: colors.textMuted }]}>{feedbackText.length}/2000</Text>
+
+              <TouchableOpacity
+                style={[styles.sendBtn, { backgroundColor: colors.primary, opacity: sendingFeedback ? 0.7 : 1 }]}
+                onPress={handleSendFeedback}
+                disabled={sendingFeedback}
+                activeOpacity={0.8}
+              >
+                {sendingFeedback ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <>
+                    <Feather name="send" size={16} color="#fff" />
+                    <Text style={styles.sendBtnText}>Send</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <TouchableOpacity
         style={[styles.saveBtn, { backgroundColor: colors.primary }]}
         onPress={handleSave}
@@ -276,4 +396,17 @@ const styles = StyleSheet.create({
   saveBtnText: { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: '#fff' },
   signOutBtn: { height: 48, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
   signOutText: { fontSize: 15, fontFamily: 'Inter_500Medium' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 34 },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: StyleSheet.hairlineWidth },
+  modalTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  modalBody: { paddingHorizontal: 20, paddingTop: 16, gap: 8 },
+  modalLabel: { fontSize: 11, fontFamily: 'Inter_600SemiBold', letterSpacing: 0.8 },
+  categoryRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 6 },
+  categoryChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  categoryChipText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  feedbackInput: { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 14, fontFamily: 'Inter_400Regular', minHeight: 120, marginTop: 6 },
+  charCount: { fontSize: 11, fontFamily: 'Inter_400Regular', textAlign: 'right' },
+  sendBtn: { height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, marginTop: 8 },
+  sendBtnText: { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: '#fff' },
 });
