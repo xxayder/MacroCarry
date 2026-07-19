@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
   fieldValue: { fontSize: 14, fontFamily: 'Inter_400Regular' },
   input: { flex: 1, marginLeft: 16, fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'right', paddingVertical: 4, paddingHorizontal: 8, borderWidth: 1, borderRadius: 8 },
   inputWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, height: 34, width: 108 },
-  inputSmall: { flex: 1, textAlign: 'right', fontSize: 14, fontFamily: 'Inter_500Medium' },
+  inputSmall: { flex: 1, textAlign: 'right', textAlignVertical: 'center', paddingVertical: 0, fontSize: 14, fontFamily: 'Inter_500Medium' },
   unit: { fontSize: 12, fontFamily: 'Inter_400Regular', marginLeft: 4 },
   divider: { height: StyleSheet.hairlineWidth },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
