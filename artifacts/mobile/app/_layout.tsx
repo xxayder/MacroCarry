@@ -14,6 +14,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { UpdateBanner } from '@/components/UpdateBanner';
 import { AuthProvider } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
 import { queryClient } from '@/lib/queryClient';
@@ -102,6 +103,7 @@ export default function RootLayout() {
             <GestureHandlerRootView>
               <KeyboardProvider>
                 <RootLayoutNav />
+                <UpdateBanner />
               </KeyboardProvider>
             </GestureHandlerRootView>
           </AuthProvider>
