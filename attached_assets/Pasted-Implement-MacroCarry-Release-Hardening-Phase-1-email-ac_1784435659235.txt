@@ -1,0 +1,92 @@
+Implement MacroCarry Release Hardening Phase 1: email account recovery.
+
+The application is currently distributed through Google Play Internal Testing and uses Expo React Native, Supabase email/password authentication, persistent sessions, and the registered native scheme "mobile".
+
+Do not:
+
+- add new product features
+- restore biometrics
+- restore Google OAuth
+- modify username uniqueness
+- modify account deletion yet
+- modify food tracking, sharing, onboarding, or nutrition behavior
+- expose Supabase secret or service-role keys
+- break the existing persistent sign-in and sign-out behavior
+
+Required functionality:
+
+1. Add “Forgot password?” to the login screen.
+
+2. Create a public forgot-password screen containing:
+   - Email field
+   - Submit button
+   - Back to sign-in
+   - Neutral success response that does not reveal whether an account exists
+
+3. Use:
+   supabase.auth.resetPasswordForEmail()
+
+4. Native recovery redirect must be:
+   mobile://auth/reset-password
+
+5. Generate or preserve the equivalent web callback for web testing without using the native redirect on web.
+
+6. Inspect app.json/app.config and confirm the existing "mobile" scheme is preserved.
+
+7. Add a reset-password route that:
+   - receives the Supabase recovery callback
+   - recognizes the PASSWORD_RECOVERY authentication event
+   - validates that a recovery session exists
+   - displays New Password and Confirm Password
+   - validates password strength and matching values
+   - calls supabase.auth.updateUser({ password })
+   - prevents duplicate submission
+   - resets every loading state in finally
+   - handles expired, invalid, reused, or missing recovery links
+   - shows a clear success state
+   - returns the user to normal sign-in after completion
+
+8. Add “Resend confirmation email” to the existing pending-confirmation screen.
+
+9. Use Supabase’s resend signup-confirmation API rather than creating another account.
+
+10. Add resend cooldown and handle:
+   - email rate limit
+   - network failure
+   - already confirmed account
+   - malformed email
+   - unknown server failure
+
+11. Keep all responses neutral regarding whether a particular email exists.
+
+12. Audit the Supabase redirect allowlist requirement.
+
+If mobile://auth/reset-password is not already allowed in Supabase, stop and give me exactly one manual dashboard action. Do not invent additional redirect URLs.
+
+13. Audit whether custom SMTP is currently configured.
+
+Do not request or expose SMTP credentials. Report whether production SMTP remains a manual blocker.
+
+14. Verify that the recovery flow does not:
+   - create a second user
+   - change username data
+   - bypass email confirmation
+   - leave the user permanently signed in unexpectedly
+   - expose tokens or callback URLs in logs
+   - create an infinite spinner
+
+15. Run:
+   - TypeScript check
+   - lint
+   - Expo production bundle validation
+   - repository search for duplicate password-recovery handlers
+
+Report only:
+
+1. Files changed.
+2. Exact native recovery URL.
+3. Whether a Supabase redirect must be added manually.
+4. Whether custom SMTP is configured.
+5. Exact installed-Android test sequence.
+6. Remaining errors or manual actions.
+7. Confirmation that existing signup, login, persistent session, and sign-out behavior were preserved.

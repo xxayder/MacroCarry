@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth, validateUsername } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
+import { supabase } from '@/lib/supabase';
 
 export default function RegisterScreen() {
   const { signUp, isConfigured } = useAuth();
@@ -35,6 +36,50 @@ export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+
+  // Resend confirmation state
+  const RESEND_COOLDOWN = 60;
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resendStatus, setResendStatus] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendCooldown]);
+
+  const handleResend = async () => {
+    if (!pendingEmail || resendLoading || resendCooldown > 0) return;
+    setResendStatus(null);
+    setResendLoading(true);
+    try {
+      const { error: resendError } = await supabase.auth.resend({
+        type: 'signup',
+        email: pendingEmail,
+      });
+      if (resendError) {
+        const msg = resendError.message.toLowerCase();
+        if (msg.includes('rate') || msg.includes('too many') || msg.includes('exceeded')) {
+          setResendStatus({ ok: false, msg: 'Too many requests. Please wait a few minutes before trying again.' });
+        } else if (msg.includes('already confirmed') || msg.includes('already registered')) {
+          // Neutral — don't reveal account status
+          setResendStatus({ ok: true, msg: 'If the email can be confirmed, a new link has been sent.' });
+        } else if (msg.includes('network') || msg.includes('fetch')) {
+          setResendStatus({ ok: false, msg: 'Network error. Check your connection and try again.' });
+        } else {
+          setResendStatus({ ok: true, msg: 'If the email can be confirmed, a new link has been sent.' });
+        }
+      } else {
+        setResendStatus({ ok: true, msg: 'A new confirmation link has been sent.' });
+      }
+      setResendCooldown(RESEND_COOLDOWN);
+    } catch {
+      setResendStatus({ ok: false, msg: 'An unexpected error occurred. Please try again.' });
+    } finally {
+      setResendLoading(false);
+    }
+  };
 
   const validate = (): string | null => {
     const trimmedUsername = username.trim();
@@ -80,6 +125,7 @@ export default function RegisterScreen() {
   // repeated signups with an existing email when confirmation is required, so
   // we cannot confirm whether an account was actually created.
   if (pendingEmail) {
+    const canResend = !resendLoading && resendCooldown === 0;
     return (
       <View
         style={[
@@ -102,12 +148,64 @@ export default function RegisterScreen() {
           {'\n\n'}
           If you already have an account, sign in instead or reset your password.
         </Text>
+
+        {/* Resend status */}
+        {resendStatus && (
+          <View
+            style={[
+              styles.resendStatus,
+              {
+                backgroundColor: resendStatus.ok ? colors.primarySubtle : colors.destructive + '18',
+                borderColor: resendStatus.ok ? colors.primary + '40' : colors.destructive + '40',
+              },
+            ]}
+          >
+            <Feather
+              name={resendStatus.ok ? 'check-circle' : 'alert-circle'}
+              size={14}
+              color={resendStatus.ok ? colors.primary : colors.destructive}
+            />
+            <Text
+              style={[
+                styles.resendStatusText,
+                { color: resendStatus.ok ? colors.primary : colors.destructive },
+              ]}
+            >
+              {resendStatus.msg}
+            </Text>
+          </View>
+        )}
+
         <TouchableOpacity
           style={[styles.btn, { backgroundColor: colors.primary }]}
           onPress={() => router.replace('/(auth)/login')}
           activeOpacity={0.8}
         >
           <Text style={styles.btnText}>Go to Sign In</Text>
+        </TouchableOpacity>
+
+        {/* Resend confirmation */}
+        <TouchableOpacity
+          style={[
+            styles.resendBtn,
+            {
+              borderColor: colors.border,
+              opacity: canResend ? 1 : 0.5,
+            },
+          ]}
+          onPress={handleResend}
+          disabled={!canResend}
+          activeOpacity={0.7}
+        >
+          {resendLoading ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : (
+            <Text style={[styles.resendBtnText, { color: colors.primary }]}>
+              {resendCooldown > 0
+                ? `Resend in ${resendCooldown}s`
+                : 'Resend confirmation email'}
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
     );
@@ -364,7 +462,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 20,
+    gap: 16,
   },
   confirmIcon: {
     width: 80,
@@ -381,4 +479,23 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   confirmEmail: { fontFamily: 'Inter_600SemiBold' },
+  resendStatus: {
+    flexDirection: 'row',
+    gap: 8,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'flex-start',
+    alignSelf: 'stretch',
+  },
+  resendStatusText: { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 19 },
+  resendBtn: {
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resendBtnText: { fontSize: 14, fontFamily: 'Inter_500Medium' },
 });

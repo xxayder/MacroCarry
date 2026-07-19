@@ -1,1 +1,2 @@
 - [EAS build in Replit](eas-replit-build.md) — must use EAS_NO_VCS=1 to bypass git lock restriction when running eas build
+- [Supabase native recovery deep link](supabase-native-recovery.md) — detectSessionInUrl:false on native; must parse URL hash fragment manually and call setSession() for password reset.

@@ -75,6 +75,10 @@ function RootLayoutNav() {
         name="auth/callback"
         options={{ headerShown: false }}
       />
+      <Stack.Screen
+        name="auth/reset-password"
+        options={{ headerShown: false }}
+      />
     </Stack>
   );
 }
