@@ -10,11 +10,12 @@ fi
 KEY_FILE="$(mktemp /tmp/gsa-XXXXXX.json)"
 trap 'rm -f "$KEY_FILE"' EXIT
 
-echo "$GOOGLE_SERVICE_ACCOUNT_KEY" > "$KEY_FILE"
+printf '%s' "$GOOGLE_SERVICE_ACCOUNT_KEY" > "$KEY_FILE"
+
+export GOOGLE_SA_KEY_PATH="$KEY_FILE"
 
 EXPO_TOKEN="$EXPO_TOKEN" EAS_NO_VCS=1 pnpm exec eas submit \
   --platform android \
   --profile production \
   --latest \
-  --android-service-account-key-path "$KEY_FILE" \
   --non-interactive
