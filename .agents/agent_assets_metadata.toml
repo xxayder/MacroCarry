@@ -12,3 +12,39 @@ id = "8cnLiC8BirTtOrC1aBR8J"
 uri = "file://artifacts/mobile/assets/images/splash-icon.png"
 type = "image"
 title = "generated_image"
+
+[[generated]]
+id = "1FY-xsWZV-Jmr3xc-lbWx"
+uri = "file://artifacts/mobile/store-assets/feature-graphic.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "dTBW53pTmE8uAP6nr3UGX"
+uri = "file://artifacts/mobile/store-assets/screenshot-today.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "jZLzXgPDT-SsLzfjPN6Fy"
+uri = "file://artifacts/mobile/store-assets/screenshot-search.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "RtC3DBHl3oOSIDGR8pPK6"
+uri = "file://artifacts/mobile/store-assets/screenshot-scanner.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "bkL1hXum_WAddYu2klLs-"
+uri = "file://artifacts/mobile/store-assets/screenshot-weekly.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "6vBuaicjJniWdau3I6vJ_"
+uri = "file://artifacts/mobile/store-assets/screenshot-settings.png"
+type = "image"
+title = "generated_image"
