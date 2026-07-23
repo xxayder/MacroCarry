@@ -161,9 +161,71 @@ Check: "Users can request data deletion" ✓
 
 ---
 
+## EAS Build — Latest Production Build
+
+| Field | Value |
+|-------|-------|
+| Build URL | https://expo.dev/accounts/xayder/projects/mobile/builds/405c876c-5b7c-465e-aa62-40db39099841 |
+| versionCode | 5 (auto-incremented) |
+| Profile | production (AAB, store distribution) |
+| Channel | production |
+| Triggered | 2026-07-23 |
+
+**To download the AAB once the build finishes (~10–20 min):**
+1. Open the build URL above → click **Download** → save the `.aab` file.
+
+---
+
+## How to Upload to Google Play Internal Testing (Manual Steps)
+
+> **Prerequisite**: Screenshots must be real device captures before submitting. See "Store Graphics Inventory" above — mockups are currently in place.
+
+### Step 1 — Create the app in Play Console (first time only)
+1. Go to [play.google.com/console](https://play.google.com/console) and sign in.
+2. Click **Create app** → App name: `MacroCarry` → Default language: `English (United States)` → App or Game: `App` → Free or Paid: `Free` → Accept policies → **Create app**.
+3. Under **App content → Privacy policy**, enter your privacy policy URL (see above).
+
+### Step 2 — Fill in the store listing
+1. Go to **Store presence → Main store listing**.
+2. App name: `MacroCarry`
+3. Short description: paste from "Short Description" section above.
+4. Full description: paste from "Full Description" section above.
+5. Upload **App icon**: `artifacts/mobile/assets/images/icon.png` (1024×1024).
+6. Upload **Feature graphic**: `artifacts/mobile/store-assets/feature-graphic.png` (1024×500).
+7. Upload **Phone screenshots** (replace mockups with real captures first): all 5 files in `store-assets/screenshot-*.png`.
+8. **Save**.
+
+### Step 3 — Complete App content requirements
+1. **Privacy policy** (Policy → App content → Privacy policy): enter your URL.
+2. **App access** (App content → App access): choose "All functionality is available without special access" (or add test credentials if sign-in is required).
+3. **Ads**: select "This app does not contain ads".
+4. **Content rating**: complete the questionnaire — answer None/No to all sensitive categories → expected rating: **Everyone**.
+5. **Target audience**: select **13 and above**.
+6. **Data safety** (Policy → App content → Data safety): fill in per the "Data safety declaration" table above. Check "Data is encrypted in transit" and "Users can request data deletion".
+
+### Step 4 — Set up Internal Testing track
+1. Go to **Testing → Internal testing** → **Create new release**.
+2. Under **App bundles**, click **Upload** and select the `.aab` downloaded from EAS.
+3. **Release name**: leave as auto-filled (e.g. `1.0.0 (5)`).
+4. **Release notes**: add a short note such as `Initial internal test release`.
+5. Click **Save** → **Review release** → **Start rollout to Internal testing**.
+
+### Step 5 — Add internal testers
+1. Go to **Testing → Internal testing → Testers** tab.
+2. Click **Create email list** → name it (e.g. `Core testers`) → add tester email addresses.
+3. Copy the **opt-in link** and share it with testers.
+4. Testers open the link on their Android device → tap **Become a tester** → install from Play Store.
+
+### Step 6 — Monitor automated review
+- Initial review for Internal Testing typically takes **a few hours to 1 business day**.
+- Watch for email notifications from Google Play.
+- If rejected, the rejection reason appears in Play Console → **Policy status**.
+
+---
+
 ## Notes for Submission
 
-1. **App signing**: Use Play App Signing (Google-managed key). Export the AAB from EAS Build.
+1. **App signing**: Use Play App Signing (Google-managed key). The AAB from EAS Build is already signed with the upload key; Google re-signs with their managed key.
 2. **EAS build command**: `EAS_NO_VCS=1 eas build --platform android --profile production`
 3. **Internal testing track**: Upload the first AAB to Internal Testing before moving to production.
-4. **Review time**: Initial review typically takes 1–7 days.
+4. **Review time**: Initial review typically takes a few hours to 1 business day for Internal Testing.
