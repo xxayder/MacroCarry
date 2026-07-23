@@ -1,0 +1,161 @@
+Create a public legal website for MacroCarry containing:
+
+1. Privacy Policy
+2. Account Deletion
+3. Terms of Use
+
+The site should be designed for deployment as a public Replit Static Deployment and later connected to a custom domain.
+
+Do not create generic or fabricated legal claims.
+
+PHASE 1 — AUDIT THE APPLICATION
+
+Before drafting the pages, inspect the entire MacroCarry repository and identify:
+
+- Supabase authentication data collected
+- all public Supabase tables and their columns
+- profile information
+- food logs
+- nutrition and health-related information
+- calorie and macro goals
+- sharing permissions and shared data
+- camera and barcode-scanning behavior
+- image access or uploads
+- location access or collection
+- crash reporting and Sentry behavior
+- analytics, telemetry, advertising, or tracking SDKs
+- support and bug-reporting data
+- local device storage
+- data transmitted to third parties
+- data retention behavior
+- current account-deletion capabilities
+- every external service or data processor used by the app
+
+Distinguish between:
+
+- packages merely installed
+- features actually used
+- data stored locally
+- data transmitted off the device
+- data stored in Supabase
+- data shared with other users
+- data shared with service providers
+
+Do not claim that MacroCarry collects a data type merely because a dependency exists.
+
+Create a concise DATA_PRIVACY_AUDIT.md containing the findings and any unanswered questions.
+
+PHASE 2 — CREATE THE LEGAL SITE
+
+Create a lightweight, responsive, accessible static website with these public routes:
+
+- /privacy
+- /delete-account
+- /terms
+
+The pages must work in a normal browser with JavaScript disabled where practical.
+
+Do not use:
+
+- PDFs
+- login requirements
+- editable documents
+- Google Docs
+- comment-enabled pages
+- geofencing
+- temporary development URLs
+- language suggesting the app is a medical device
+
+PRIVACY POLICY REQUIREMENTS
+
+The Privacy Policy must:
+
+- Be titled “MacroCarry Privacy Policy.”
+- Identify the exact developer or company name used in the Google Play listing.
+- Display an effective date and last-updated date.
+- Include a privacy contact email.
+- Describe each category of data actually collected.
+- Explain why each category is collected.
+- Explain how each category is used.
+- Identify service providers that receive or process data.
+- State whether personal data is sold.
+- Describe user-to-user sharing behavior.
+- Explain device permissions, including camera access.
+- Explain security measures without making absolute guarantees.
+- Describe data retention.
+- Explain account and data deletion.
+- Explain user choices and rights.
+- State the intended age range and child-data policy.
+- Explain that nutrition information is not medical advice.
+- State that MacroCarry is not a medical device and does not diagnose, treat, cure, or prevent any medical condition.
+- Include a method for users to submit privacy questions.
+- Match the app’s eventual Google Play Data Safety answers.
+
+Do not invent exact retention periods unless they are confirmed.
+
+ACCOUNT DELETION PAGE REQUIREMENTS
+
+The /delete-account page must:
+
+- Clearly identify MacroCarry.
+- Explain how to delete an account inside the app.
+- Provide an external method to request deletion without opening or reinstalling the app.
+- Identify what account data will be deleted.
+- Identify any information that must legally or operationally be retained.
+- Explain the expected processing period.
+- Include a secure deletion-request mechanism or support-email workflow.
+- Avoid collecting more identity information than necessary.
+- Never expose a Supabase service-role key in browser code.
+
+Do not pretend automated account deletion exists if it has not been implemented.
+
+TERMS PAGE REQUIREMENTS
+
+The /terms page should cover:
+
+- user responsibilities
+- permitted use
+- account security
+- nutrition and health disclaimer
+- availability and service changes
+- limitation of liability using reasonable language
+- account suspension or termination
+- contact information
+
+PHASE 3 — APP INTEGRATION
+
+Add links in MacroCarry Settings under a “Legal and Support” section:
+
+- Privacy Policy
+- Terms of Use
+- Delete Account
+- Contact Support
+
+Use external browser links to the public URLs.
+
+Do not implement account deletion during this task unless a secure server-side implementation already exists.
+
+PHASE 4 — DEPLOYMENT PREPARATION
+
+Prepare the legal site for a Replit Static Deployment.
+
+Recommend one exact custom-domain structure, preferably:
+
+https://macrocarry.DOMAIN/privacy
+https://macrocarry.DOMAIN/delete-account
+https://macrocarry.DOMAIN/terms
+
+Do not connect or alter DNS automatically.
+
+Report:
+
+1. Actual data practices found.
+2. Unanswered questions I must decide.
+3. Files created.
+4. Exact deployment directory.
+5. Exact Replit static deployment settings.
+6. Exact URLs to add to Google Play Console.
+7. Exact app files changed to add the legal links.
+8. Any policy statement that still requires confirmation.
+
+Do not publish the pages until all unresolved factual questions are presented to me.

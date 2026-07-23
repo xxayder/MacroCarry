@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Modal,
   ScrollView,
   StyleSheet,
@@ -13,6 +14,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
+const LEGAL_BASE = 'https://macrocarry.replit.app/legal';
+const LEGAL_URLS = {
+  privacy: `${LEGAL_BASE}/privacy`,
+  terms: `${LEGAL_BASE}/terms`,
+  deleteAccount: `${LEGAL_BASE}/delete-account`,
+  support: 'mailto:privacy@macrocarry.app',
+};
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/context/AuthContext';
@@ -231,6 +240,38 @@ export default function SettingsScreen() {
           label="Send feedback"
           icon="message-square"
           onPress={() => setFeedbackVisible(true)}
+          colors={colors}
+        />
+      </View>
+
+      {/* Legal & Support */}
+      <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>LEGAL & SUPPORT</Text>
+        <NavRow
+          label="Privacy Policy"
+          icon="shield"
+          onPress={() => Linking.openURL(LEGAL_URLS.privacy)}
+          colors={colors}
+        />
+        <Div colors={colors} />
+        <NavRow
+          label="Terms of Use"
+          icon="file-text"
+          onPress={() => Linking.openURL(LEGAL_URLS.terms)}
+          colors={colors}
+        />
+        <Div colors={colors} />
+        <NavRow
+          label="Delete Account"
+          icon="trash-2"
+          onPress={() => Linking.openURL(LEGAL_URLS.deleteAccount)}
+          colors={colors}
+        />
+        <Div colors={colors} />
+        <NavRow
+          label="Contact Support"
+          icon="mail"
+          onPress={() => Linking.openURL(LEGAL_URLS.support)}
           colors={colors}
         />
       </View>
