@@ -58,7 +58,24 @@ SA_PRIVATE_KEY=$(printf '%s' "$GOOGLE_SERVICE_ACCOUNT_KEY" | \
 
 # 2. Write private key to a temp file for openssl signing
 KEY_PEM=$(mktemp /tmp/sa-pem-XXXXXX.pem)
-trap 'rm -f "$KEY_PEM"' EXIT
+
+# DANGLING_EDIT_ID holds the Play Console draft edit ID while it is open.
+# The _cleanup trap deletes it on any exit (success, SIGINT, EAS error, etc.)
+# so a failed run never leaves a 409-blocking edit behind.
+# It is cleared to "" immediately after the inline DELETE succeeds.
+DANGLING_EDIT_ID=""
+
+_cleanup() {
+  rm -f "${KEY_PEM:-}" "${TOKEN_FILE:-}" "${EDIT_FILE:-}" "${KEY_FILE:-}"
+  if [ -n "${DANGLING_EDIT_ID:-}" ] && [ -n "${ACCESS_TOKEN:-}" ]; then
+    curl -s --max-time 10 -X DELETE \
+      -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+      "${PLAY_API_BASE}/${ANDROID_PACKAGE}/edits/${DANGLING_EDIT_ID}" \
+      > /dev/null 2>&1 || true
+  fi
+}
+trap '_cleanup' EXIT
+
 printf '%s\n' "$SA_PRIVATE_KEY" > "$KEY_PEM"
 
 # 3. Build a short-lived JWT (RS256, 5-minute expiry)
@@ -75,7 +92,6 @@ JWT="$SIGNING_INPUT.$JWT_SIG"
 # 4. Exchange JWT for an access token.
 #    Do NOT use -f so that OAuth error JSON is captured (not silently dropped).
 TOKEN_FILE=$(mktemp /tmp/sa-token-XXXXXX.json)
-trap 'rm -f "$KEY_PEM" "$TOKEN_FILE"' EXIT
 
 TOKEN_HTTP=$(curl -s -o "$TOKEN_FILE" -w "%{http_code}" --max-time 10 \
   -H "Content-Type: application/x-www-form-urlencoded" \
@@ -103,7 +119,6 @@ ACCESS_TOKEN=$(python3 -c "import json; print(json.load(open('$TOKEN_FILE'))['ac
 #    We immediately delete the edit if creation succeeds to leave no side effects.
 #    A 409 (edit already in progress) also confirms we have permission.
 EDIT_FILE=$(mktemp /tmp/sa-edit-XXXXXX.json)
-trap 'rm -f "$KEY_PEM" "$TOKEN_FILE" "$EDIT_FILE"' EXIT
 
 EDIT_HTTP=$(curl -s -o "$EDIT_FILE" -w "%{http_code}" --max-time 10 \
   -X POST \
@@ -115,12 +130,14 @@ EDIT_HTTP=$(curl -s -o "$EDIT_FILE" -w "%{http_code}" --max-time 10 \
 case "$EDIT_HTTP" in
   200|201)
     echo "  Service account OK — authenticated and has Release Manager access."
-    # Clean up the draft edit so it doesn't block future releases
-    EDIT_ID=$(python3 -c "import json; print(json.load(open('$EDIT_FILE')).get('id',''))" 2>/dev/null || true)
-    if [ -n "$EDIT_ID" ]; then
+    # Register the edit ID so the EXIT trap can delete it even if we are interrupted
+    DANGLING_EDIT_ID=$(python3 -c "import json; print(json.load(open('$EDIT_FILE')).get('id',''))" 2>/dev/null || true)
+    # Also delete inline now so EAS doesn't see an open edit during the build
+    if [ -n "$DANGLING_EDIT_ID" ]; then
       curl -s --max-time 10 -X DELETE \
         -H "Authorization: Bearer $ACCESS_TOKEN" \
-        "${PLAY_API_BASE}/${ANDROID_PACKAGE}/edits/${EDIT_ID}" > /dev/null 2>&1 || true
+        "${PLAY_API_BASE}/${ANDROID_PACKAGE}/edits/${DANGLING_EDIT_ID}" > /dev/null 2>&1 || true
+      DANGLING_EDIT_ID=""  # cleared — trap is now a no-op for this edit
     fi
     ;;
   409)
@@ -167,7 +184,6 @@ echo ""
 # ── Write key to a temp file EAS can reference ────────────────────────────────
 
 KEY_FILE="$(mktemp /tmp/gsa-XXXXXX.json)"
-trap 'rm -f "$KEY_PEM" "$TOKEN_FILE" "$EDIT_FILE" "$KEY_FILE"' EXIT
 
 printf '%s' "$GOOGLE_SERVICE_ACCOUNT_KEY" > "$KEY_FILE"
 export GOOGLE_SA_KEY_PATH="$KEY_FILE"
