@@ -8,7 +8,8 @@
     "build": "node scripts/build.js",
     "serve": "node server/serve.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "submit:android": "bash scripts/submit-android.sh"
+    "submit:android": "bash scripts/submit-android.sh",
+    "build:submit": "bash scripts/build-and-submit.sh"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

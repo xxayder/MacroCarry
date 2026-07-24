@@ -161,6 +161,66 @@ Check: "Users can request data deletion" ✓
 
 ---
 
+## Automated Build + Submit (One Command)
+
+Instead of building manually and uploading the AAB through the browser, you can run a single command that builds the AAB via EAS and pushes it directly to Google Play.
+
+### Prerequisites — two Replit Secrets
+
+| Secret name | What to put there |
+|---|---|
+| `EXPO_TOKEN` | An EAS personal access token — create one at [expo.dev → Account → Access Tokens](https://expo.dev/settings/access-tokens) |
+| `GOOGLE_SERVICE_ACCOUNT_KEY` | The full JSON content of a Google Play service account key (see setup below) |
+
+### One-time Google Play service account setup
+
+1. **Google Cloud Console** → open [console.cloud.google.com](https://console.cloud.google.com) and select (or create) the project linked to your Play Console account.
+2. **Create a service account** → IAM & Admin → Service Accounts → **Create service account** → name it `eas-submit` → click Done (no roles needed at this step).
+3. **Create a JSON key** → click the account → Keys tab → **Add key → Create new key → JSON** → download the file.
+4. **Link the service account to Play Console** → in [play.google.com/console](https://play.google.com/console) → Setup → **API access** → if prompted, link the same GCP project → find the `eas-submit` service account in the list → **Grant access → Release manager** → Apply.
+5. **Store the key in Replit** → open the downloaded JSON file, copy its entire content (including the `{` `}` braces), and paste it as the value of the `GOOGLE_SERVICE_ACCOUNT_KEY` secret in Replit Secrets.
+
+> **Note**: Play Console's "API access" page must show the service account with at least **Release manager** permission on your app; without this, EAS Submit will get a permissions error when it tries to upload the AAB.
+
+### Run the automated build + submit
+
+From the Replit shell (inside `artifacts/mobile`):
+
+```bash
+pnpm run build:submit
+```
+
+Or from the workspace root:
+
+```bash
+pnpm --filter @workspace/mobile run build:submit
+```
+
+This runs `scripts/build-and-submit.sh`, which:
+1. Validates that `EXPO_TOKEN` and `GOOGLE_SERVICE_ACCOUNT_KEY` are set.
+2. Writes the service account JSON to a secure temp file and exports `GOOGLE_SA_KEY_PATH` pointing to it.
+3. Runs `EAS_NO_VCS=1 eas build --platform android --profile production --auto-submit --non-interactive`.
+4. EAS builds the AAB on Expo's servers, then calls `eas submit` automatically using the `submit.production.android` config in `eas.json` (internal track, service account key from `$GOOGLE_SA_KEY_PATH`).
+
+**Separate submit only** (if you already have a finished EAS build): `pnpm run submit:android` — uploads the latest finished production build without triggering a new build.
+
+### eas.json submit config (already in place)
+
+```json
+"submit": {
+  "production": {
+    "android": {
+      "serviceAccountKeyPath": "$GOOGLE_SA_KEY_PATH",
+      "track": "internal"
+    }
+  }
+}
+```
+
+`$GOOGLE_SA_KEY_PATH` is expanded at runtime by the shell script before EAS is invoked.
+
+---
+
 ## EAS Build — Latest Production Build
 
 | Field | Value |
@@ -226,6 +286,7 @@ Check: "Users can request data deletion" ✓
 ## Notes for Submission
 
 1. **App signing**: Use Play App Signing (Google-managed key). The AAB from EAS Build is already signed with the upload key; Google re-signs with their managed key.
-2. **EAS build command**: `EAS_NO_VCS=1 eas build --platform android --profile production`
-3. **Internal testing track**: Upload the first AAB to Internal Testing before moving to production.
-4. **Review time**: Initial review typically takes a few hours to 1 business day for Internal Testing.
+2. **Automated build + submit**: `pnpm run build:submit` (requires `EXPO_TOKEN` and `GOOGLE_SERVICE_ACCOUNT_KEY` secrets — see "Automated Build + Submit" section above).
+3. **Manual build only**: `EAS_NO_VCS=1 eas build --platform android --profile production` (then upload the AAB manually or run `pnpm run submit:android`).
+4. **Internal testing track**: Upload the first AAB to Internal Testing before moving to production.
+5. **Review time**: Initial review typically takes a few hours to 1 business day for Internal Testing.
