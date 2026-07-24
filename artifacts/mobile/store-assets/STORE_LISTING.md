@@ -172,6 +172,20 @@ Instead of building manually and uploading the AAB through the browser, you can 
 | `EXPO_TOKEN` | An EAS personal access token — create one at [expo.dev → Account → Access Tokens](https://expo.dev/settings/access-tokens) |
 | `GOOGLE_SERVICE_ACCOUNT_KEY` | The full JSON content of a Google Play service account key (see setup below) |
 
+**Before your first build (or whenever a secret changes), run the preflight check:**
+
+```bash
+pnpm run preflight
+```
+
+Or from the workspace root:
+
+```bash
+pnpm --filter @workspace/mobile run preflight
+```
+
+This validates your `EXPO_TOKEN` (via `eas whoami`) and your Play Console service account permissions in under 10 seconds — catching misconfigurations before they waste a full build credit. Fix any failures reported, then proceed with `pnpm run build:submit`.
+
 ### One-time Google Play service account setup
 
 1. **Google Cloud Console** → open [console.cloud.google.com](https://console.cloud.google.com) and select (or create) the project linked to your Play Console account.

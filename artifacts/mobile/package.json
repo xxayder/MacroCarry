@@ -8,6 +8,7 @@
     "build": "node scripts/build.js",
     "serve": "node server/serve.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "preflight": "bash scripts/preflight.sh",
     "submit:android": "bash scripts/submit-android.sh",
     "build:submit": "bash scripts/build-and-submit.sh"
   },
