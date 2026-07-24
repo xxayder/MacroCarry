@@ -44,7 +44,7 @@ jobs:
             --branch production \
             --platform android \
             --environment production \
-            --message "CI: ${{ github.event.head_commit.message }}" \
+            --message "CI update $GITHUB_SHA" \
             --non-interactive
         env:
           EAS_NO_VCS: 1
